@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "510282064190",
+    "project_id": "tawasol-261fe",
+    "storage_bucket": "tawasol-261fe.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:510282064190:android:374afe24e098bfe13f0c6f",
+        "android_client_info": {
+          "package_name": "com.example.madrastak_fe_masr"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCPYJhJg8KI4wkYj4a_Gc7N7vkgigdVMW8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
