@@ -19,6 +19,9 @@ class _HomeTabState extends State<HomeTab> {
   // Static course ID - will be dynamic in the future
   static const int _staticCourseId = 21273;
 
+  // TODO: Get actual userId from auth service - fallback for when studentData is not loaded
+  static const String _fallbackUserId = 'c5061673-5b5f-4e5e-ab78-d9f51eef3dd2';
+
   // Services
   final CoursesService _coursesService = CoursesService();
   final SpaceService _spaceService = SpaceService();
@@ -220,6 +223,7 @@ class _HomeTabState extends State<HomeTab> {
         showCourseHeader: true,
         userName: _studentData?.userBasicInfo.name ?? 'مستخدم',
         userImage: _studentData?.userBasicInfo.profilePicture,
+        currentUserId: _studentData?.id ?? _fallbackUserId,
       );
     }
 

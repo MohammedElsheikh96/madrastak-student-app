@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter pub get:*)",
+      "Bash(flutter clean:*)",
+      "Bash(flutter analyze:*)",
+      "Bash(flutter pub upgrade:*)",
+      "Bash(flutter build:*)",
+      "Bash(where:*)",
+      "Bash(flutter run:*)",
+      "Bash(flutter devices:*)",
+      "Bash(timeout:*)",
+      "Bash(flutter install:*)",
+      "Bash(adb:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd Flutter app with FCM notifications and social features\n\n- Implement complete notification system with Firebase Cloud Messaging\n- Add NotificationsPage with infinite scroll pagination \\(20 items per page\\)\n- Integrate Tawasol API for notifications \\(GetMyNotifications, MarkAsRead\\)\n- Add NotificationBellIcon with unread count badge\n- Configure Firebase for Android with google-services.json\n- Add bottom safe area padding to all tabs \\(home, profile, study materials\\)\n- Use GoogleFonts.alexandria consistently across notification UI\n- Include home page with custom curved bottom navigation bar\n- Add study materials tab with course grid view\n- Add profile tab with user information display\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(git restore:*)",
+      "Bash(flutter pub run:*)"
+    ]
+  }
+}

@@ -31,6 +31,8 @@ class _CommunicationTabState extends State<CommunicationTab> {
   // Mock user data - will be replaced with real data from storage
   final String _userName = 'محمد احمد محمد';
   final String? _userImage = null; // Will use placeholder
+  // TODO: Get actual userId from auth service
+  static const String _userId = 'c5061673-5b5f-4e5e-ab78-d9f51eef3dd2';
 
   // Pagination state
   final SpaceService _spaceService = SpaceService();
@@ -332,10 +334,13 @@ class _CommunicationTabState extends State<CommunicationTab> {
                   postId: post.id,
                   authorName: post.authorName,
                   authorImage: post.authorImage,
+                  authorUserId: post.user?.id,
+                  currentUserId: _userId,
                   date: post.formattedDate,
                   title: post.title,
                   content: post.plainContent,
                   images: post.images.isNotEmpty ? post.images : null,
+                  files: post.files.isNotEmpty ? post.files : null,
                   isCoursPost: false,
                   isPinned: post.isPinned,
                   likesCount: post.likesCount,
@@ -369,6 +374,7 @@ class _CommunicationTabState extends State<CommunicationTab> {
                     });
                   },
                   onPostSheetClosed: _refreshPosts,
+                  onPostDeleted: _refreshPosts,
                 ),
               );
             }

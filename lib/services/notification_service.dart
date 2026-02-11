@@ -12,7 +12,7 @@ class NotificationService extends ChangeNotifier {
 
   // Temporary static token - same as in ApiClient
   static const String _staticToken =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjJiODVmZTk2LTU3ZjgtNDBiNi05NjAxLTMyYTA3Mjg4NmUxMSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvdXNlcmRhdGEiOiJjNTA2MTY3My01YjVmLTRlNWUtYWI3OC1kOWY1MWVlZjNkZDIiLCJuYW1lIjoi2LnYqNiv2KfZhNmH2KfYr9mJINmF2K3ZhdivINi52KjYr9in2YTZh9in2K_ZiSDYudmE2Ykg2KfZhNi02YrZiNmJIiwiZW1haWwiOiIxNDU0MUBzYWJyb2FkLm1vZS5lZHUuZWciLCJwaG9uZV9udW1iZXIiOiIiLCJwcm9maWxlX3BpY3R1cmVfdXJsIjoiIiwic3RhZ2VfbmFtZSI6Itin2YTYqti52YTZitmFINin2YTYp9i52K_Yp9iv2YogIiwiZ3JhZGVfbmFtZSI6Itin2YTYtdmBINin2YTYq9in2YbZiiDYp9mE2KfYudiv2KfYr9mKIiwiY291bnRyeV9uYW1lIjoi2KXZiti32KfZhNmK2KciLCJuYmYiOjE3Njk1MTQ3MTEsImV4cCI6MTc2OTg2MDMxMSwiaWF0IjoxNzY5NTE0NzExfQ.uLbi6Ih3MsUq-Hyastmj2HP7IPpw9EgGz01gvsi3NiY';
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjJiODVmZTk2LTU3ZjgtNDBiNi05NjAxLTMyYTA3Mjg4NmUxMSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvdXNlcmRhdGEiOiJjNTA2MTY3My01YjVmLTRlNWUtYWI3OC1kOWY1MWVlZjNkZDIiLCJuYW1lIjoi2LnYqNiv2KfZhNmH2KfYr9mJINmF2K3ZhdivINi52KjYr9in2YTZh9in2K_ZiSDYudmE2Ykg2KfZhNi02YrZiNmJIiwiZW1haWwiOiIxNDU0MUBzYWJyb2FkLm1vZS5lZHUuZWciLCJwaG9uZV9udW1iZXIiOiIiLCJwcm9maWxlX3BpY3R1cmVfdXJsIjoiIiwic3RhZ2VfbmFtZSI6Itin2YTYqti52YTZitmFINin2YTYp9i52K_Yp9iv2YogIiwiZ3JhZGVfbmFtZSI6Itin2YTYtdmBINin2YTYq9in2YbZiiDYp9mE2KfYudiv2KfYr9mKIiwiY291bnRyeV9uYW1lIjoi2KXZiti32KfZhNmK2KciLCJuYmYiOjE3NzA1NTU0OTMsImV4cCI6MTc3MDkwMTA5MywiaWF0IjoxNzcwNTU1NDkzfQ.y0Bofp8ubOD6-6cE0Pudi0TURooNIrvGe756Dm_mbjg';
 
   Map<String, String> _getHeaders() {
     return {
@@ -56,13 +56,17 @@ class NotificationService extends ChangeNotifier {
     try {
       final headers = _getHeaders();
       final response = await http.get(
-        Uri.parse('${ApiConfig.tawasolApiUrl}/Notification/GetMyNotifications?pageNumber=$page&pageSize=$pageSize'),
+        Uri.parse(
+          '${ApiConfig.tawasolApiUrl}/Notification/GetMyNotifications?pageNumber=$page&pageSize=$pageSize',
+        ),
         headers: headers,
       );
 
       if (response.statusCode == 200) {
         final jsonData = jsonDecode(response.body);
-        final notificationResponse = NotificationsApiResponse.fromJson(jsonData);
+        final notificationResponse = NotificationsApiResponse.fromJson(
+          jsonData,
+        );
 
         if (append) {
           _notifications.addAll(notificationResponse.items);
@@ -161,10 +165,7 @@ class NotificationService extends ChangeNotifier {
       final response = await http.post(
         Uri.parse('${ApiConfig.tawasolApiUrl}/UserDevice/Register'),
         headers: headers,
-        body: jsonEncode({
-          'deviceToken': token,
-          'deviceType': deviceType,
-        }),
+        body: jsonEncode({'deviceToken': token, 'deviceType': deviceType}),
       );
 
       return response.statusCode == 200;
@@ -193,7 +194,8 @@ class NotificationService extends ChangeNotifier {
     for (final notification in _notifications) {
       // Only group likes by postId
       if (notification.referenceType == NotificationType.like) {
-        final postId = notification.notificationDetails?.postId ??
+        final postId =
+            notification.notificationDetails?.postId ??
             notification.refrenceId ??
             notification.id;
         final key = 'like_$postId';
@@ -204,16 +206,18 @@ class NotificationService extends ChangeNotifier {
         groupedByPost[key]!.add(notification);
       } else {
         // Don't group other types
-        result.add(GroupedNotification(
-          type: notification.referenceType,
-          postId: notification.notificationDetails?.postId,
-          notifications: [notification],
-          count: 1,
-          senderNames: notification.senderName != null
-              ? [notification.senderName!]
-              : [],
-          isRead: notification.isRead,
-        ));
+        result.add(
+          GroupedNotification(
+            type: notification.referenceType,
+            postId: notification.notificationDetails?.postId,
+            notifications: [notification],
+            count: 1,
+            senderNames: notification.senderName != null
+                ? [notification.senderName!]
+                : [],
+            isRead: notification.isRead,
+          ),
+        );
       }
     }
 
@@ -231,19 +235,24 @@ class NotificationService extends ChangeNotifier {
 
       final allRead = notifications.every((n) => n.isRead);
 
-      result.add(GroupedNotification(
-        type: NotificationType.like,
-        postId: entry.key.replaceFirst('like_', ''),
-        notifications: notifications,
-        count: notifications.length,
-        senderNames: senderNames,
-        isRead: allRead,
-      ));
+      result.add(
+        GroupedNotification(
+          type: NotificationType.like,
+          postId: entry.key.replaceFirst('like_', ''),
+          notifications: notifications,
+          count: notifications.length,
+          senderNames: senderNames,
+          isRead: allRead,
+        ),
+      );
     }
 
     // Sort by latest notification time
-    result.sort((a, b) =>
-        b.latestNotification.createdAt.compareTo(a.latestNotification.createdAt));
+    result.sort(
+      (a, b) => b.latestNotification.createdAt.compareTo(
+        a.latestNotification.createdAt,
+      ),
+    );
 
     _groupedNotifications = result;
   }

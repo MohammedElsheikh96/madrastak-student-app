@@ -10,7 +10,7 @@ class PostService {
 
   // Static token for testing - same as ApiClient
   static const String _staticToken =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjJiODVmZTk2LTU3ZjgtNDBiNi05NjAxLTMyYTA3Mjg4NmUxMSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvdXNlcmRhdGEiOiJjNTA2MTY3My01YjVmLTRlNWUtYWI3OC1kOWY1MWVlZjNkZDIiLCJuYW1lIjoi2LnYqNiv2KfZhNmH2KfYr9mJINmF2K3ZhdivINi52KjYr9in2YTZh9in2K_ZiSDYudmE2Ykg2KfZhNi02YrZiNmJIiwiZW1haWwiOiIxNDU0MUBzYWJyb2FkLm1vZS5lZHUuZWciLCJwaG9uZV9udW1iZXIiOiIiLCJwcm9maWxlX3BpY3R1cmVfdXJsIjoiIiwic3RhZ2VfbmFtZSI6Itin2YTYqti52YTZitmFINin2YTYp9i52K_Yp9iv2YogIiwiZ3JhZGVfbmFtZSI6Itin2YTYtdmBINin2YTYq9in2YbZiiDYp9mE2KfYudiv2KfYr9mKIiwiY291bnRyeV9uYW1lIjoi2KXZiti32KfZhNmK2KciLCJuYmYiOjE3Njk1MTQ3MTEsImV4cCI6MTc2OTg2MDMxMSwiaWF0IjoxNzY5NTE0NzExfQ.uLbi6Ih3MsUq-Hyastmj2HP7IPpw9EgGz01gvsi3NiY';
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjJiODVmZTk2LTU3ZjgtNDBiNi05NjAxLTMyYTA3Mjg4NmUxMSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvdXNlcmRhdGEiOiJjNTA2MTY3My01YjVmLTRlNWUtYWI3OC1kOWY1MWVlZjNkZDIiLCJuYW1lIjoi2LnYqNiv2KfZhNmH2KfYr9mJINmF2K3ZhdivINi52KjYr9in2YTZh9in2K_ZiSDYudmE2Ykg2KfZhNi02YrZiNmJIiwiZW1haWwiOiIxNDU0MUBzYWJyb2FkLm1vZS5lZHUuZWciLCJwaG9uZV9udW1iZXIiOiIiLCJwcm9maWxlX3BpY3R1cmVfdXJsIjoiIiwic3RhZ2VfbmFtZSI6Itin2YTYqti52YTZitmFINin2YTYp9i52K_Yp9iv2YogIiwiZ3JhZGVfbmFtZSI6Itin2YTYtdmBINin2YTYq9in2YbZiiDYp9mE2KfYudiv2KfYr9mKIiwiY291bnRyeV9uYW1lIjoi2KXZiti32KfZhNmK2KciLCJuYmYiOjE3NzA1NTU0OTMsImV4cCI6MTc3MDkwMTA5MywiaWF0IjoxNzcwNTU1NDkzfQ.y0Bofp8ubOD6-6cE0Pudi0TURooNIrvGe756Dm_mbjg';
 
   Future<String?> _getToken() async {
     // TODO: Uncomment when Azure AD is configured
@@ -84,6 +84,48 @@ class PostService {
           success: false,
           message: 'غير مصرح - يرجى تسجيل الدخول مرة أخرى',
         );
+      } else {
+        return PostResult(
+          success: false,
+          message: 'حدث خطأ: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      return PostResult(success: false, message: 'حدث خطأ في الاتصال: $e');
+    }
+  }
+
+  /// Delete a post by ID
+  Future<PostResult> deletePost(String postId) async {
+    try {
+      final token = await _getToken();
+      if (token == null) {
+        return PostResult(
+          success: false,
+          message: 'غير مصرح - يرجى تسجيل الدخول',
+        );
+      }
+
+      final uri = Uri.parse('$_baseUrl/Post/Delete/$postId');
+      final response = await http.delete(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        return PostResult(success: true, message: 'تم حذف المنشور بنجاح');
+      } else if (response.statusCode == 403) {
+        return PostResult(success: false, message: 'غير مصرح بحذف هذا المنشور');
+      } else if (response.statusCode == 401) {
+        return PostResult(
+          success: false,
+          message: 'غير مصرح - يرجى تسجيل الدخول مرة أخرى',
+        );
+      } else if (response.statusCode == 404) {
+        return PostResult(success: false, message: 'المنشور غير موجود');
       } else {
         return PostResult(
           success: false,

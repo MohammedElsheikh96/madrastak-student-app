@@ -16,9 +16,12 @@ class CoursesService {
   static const String _coursesBaseUrl =
       'https://mfm-student.madrasetna.net/api';
 
+  // Base URL for Tasks API - tm-plus
+  static const String _tasksBaseUrl = 'https://tm-plus.madrasetna.net/api';
+
   // Static token for testing (public for external quiz access)
   static const String staticToken =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjJiODVmZTk2LTU3ZjgtNDBiNi05NjAxLTMyYTA3Mjg4NmUxMSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvdXNlcmRhdGEiOiJjNTA2MTY3My01YjVmLTRlNWUtYWI3OC1kOWY1MWVlZjNkZDIiLCJuYW1lIjoi2LnYqNiv2KfZhNmH2KfYr9mJINmF2K3ZhdivINi52KjYr9in2YTZh9in2K_ZiSDYudmE2Ykg2KfZhNi02YrZiNmJIiwiZW1haWwiOiIxNDU0MUBzYWJyb2FkLm1vZS5lZHUuZWciLCJwaG9uZV9udW1iZXIiOiIiLCJwcm9maWxlX3BpY3R1cmVfdXJsIjoiIiwic3RhZ2VfbmFtZSI6Itin2YTYqti52YTZitmFINin2YTYp9i52K_Yp9iv2YogIiwiZ3JhZGVfbmFtZSI6Itin2YTYtdmBINin2YTYq9in2YbZiiDYp9mE2KfYudiv2KfYr9mKIiwiY291bnRyeV9uYW1lIjoi2KXZiti32KfZhNmK2KciLCJuYmYiOjE3Njk1MTQ3MTEsImV4cCI6MTc2OTg2MDMxMSwiaWF0IjoxNzY5NTE0NzExfQ.uLbi6Ih3MsUq-Hyastmj2HP7IPpw9EgGz01gvsi3NiY';
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjJiODVmZTk2LTU3ZjgtNDBiNi05NjAxLTMyYTA3Mjg4NmUxMSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvdXNlcmRhdGEiOiJjNTA2MTY3My01YjVmLTRlNWUtYWI3OC1kOWY1MWVlZjNkZDIiLCJuYW1lIjoi2LnYqNiv2KfZhNmH2KfYr9mJINmF2K3ZhdivINi52KjYr9in2YTZh9in2K_ZiSDYudmE2Ykg2KfZhNi02YrZiNmJIiwiZW1haWwiOiIxNDU0MUBzYWJyb2FkLm1vZS5lZHUuZWciLCJwaG9uZV9udW1iZXIiOiIiLCJwcm9maWxlX3BpY3R1cmVfdXJsIjoiIiwic3RhZ2VfbmFtZSI6Itin2YTYqti52YTZitmFINin2YTYp9i52K_Yp9iv2YogIiwiZ3JhZGVfbmFtZSI6Itin2YTYtdmBINin2YTYq9in2YbZiiDYp9mE2KfYudiv2KfYr9mKIiwiY291bnRyeV9uYW1lIjoi2KXZiti32KfZhNmK2KciLCJuYmYiOjE3NzA1NTU0OTMsImV4cCI6MTc3MDkwMTA5MywiaWF0IjoxNzcwNTU1NDkzfQ.y0Bofp8ubOD6-6cE0Pudi0TURooNIrvGe756Dm_mbjg';
 
   // Create HTTP client that bypasses SSL certificate verification (for development only)
   http.Client _createHttpClient() {
@@ -115,12 +118,17 @@ class CoursesService {
     }
   }
 
-  /// Get tasks by day for a course
-  Future<TasksByDayResponse?> getTasksByDay(String userId, int courseId) async {
+  /// Get tasks by day for a course with pagination
+  Future<TasksByDayResponse?> getTasksByDay(
+    String userId,
+    int courseId, {
+    int pageNumber = 1,
+    int pageSize = 50,
+  }) async {
     final client = _createHttpClient();
     try {
       final uri = Uri.parse(
-        '$_coursesBaseUrl/Tasks/GetNewTasksByDay?UserId=$userId&CourseId=$courseId',
+        '$_tasksBaseUrl/Tasks/GetNewTasksByDay?UserId=$userId&courseId=$courseId&PageNumber=$pageNumber&PageSize=$pageSize',
       );
       debugPrint('CoursesService: getTasksByDay URL: $uri');
 
@@ -138,7 +146,7 @@ class CoursesService {
       if (response.statusCode == 200) {
         final jsonData = jsonDecode(response.body);
         debugPrint(
-          'CoursesService: getTasksByDay status: ${jsonData['status']}',
+          'CoursesService: getTasksByDay success: ${jsonData['success']}',
         );
         return TasksByDayResponse.fromJson(jsonData);
       }
@@ -157,7 +165,7 @@ class CoursesService {
   /// 2. Call MarkTaskCompletionAsFinish to mark it as finished
   Future<bool> showMark({
     required String userId,
-    required int taskId,
+    required String taskId,
     required String? dueDate,
   }) async {
     final client = _createHttpClient();
@@ -352,8 +360,14 @@ class CoursesService {
 
   // AWS S3 credentials for PDF signing (from environment.awsCred)
   // TODO: Move these to environment variables or secure storage
-  static const String _awsAccessKey = String.fromEnvironment('AWS_ACCESS_KEY', defaultValue: '');
-  static const String _awsSecretKey = String.fromEnvironment('AWS_SECRET_KEY', defaultValue: '');
+  static const String _awsAccessKey = String.fromEnvironment(
+    'AWS_ACCESS_KEY',
+    defaultValue: '',
+  );
+  static const String _awsSecretKey = String.fromEnvironment(
+    'AWS_SECRET_KEY',
+    defaultValue: '',
+  );
   static const String _awsRegion = 'eu-central-1';
   static const String _awsBucket = 'madrstna-plus-bucket-v2';
 

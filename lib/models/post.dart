@@ -94,6 +94,11 @@ class Post {
         .toList();
   }
 
+  // Get document files (PDF, Word, PowerPoint, Excel)
+  List<PostFile> get documentFiles {
+    return files.where((file) => file.isDocument).toList();
+  }
+
   // Strip HTML tags from content
   String get plainContent {
     if (content == null) return '';
@@ -192,6 +197,65 @@ class PostFile {
   }
 
   bool get isImage => type?.startsWith('image/') ?? false;
+
+  /// Check if file is a PDF
+  bool get isPdf {
+    final ext = _extension.toLowerCase();
+    return ext == 'pdf' || type == 'application/pdf';
+  }
+
+  /// Check if file is a Word document
+  bool get isWord {
+    final ext = _extension.toLowerCase();
+    return ext == 'doc' || ext == 'docx' ||
+           type == 'application/msword' ||
+           type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  }
+
+  /// Check if file is a PowerPoint presentation
+  bool get isPowerPoint {
+    final ext = _extension.toLowerCase();
+    return ext == 'ppt' || ext == 'pptx' ||
+           type == 'application/vnd.ms-powerpoint' ||
+           type == 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+  }
+
+  /// Check if file is an Excel spreadsheet
+  bool get isExcel {
+    final ext = _extension.toLowerCase();
+    return ext == 'xls' || ext == 'xlsx' ||
+           type == 'application/vnd.ms-excel' ||
+           type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  }
+
+  /// Check if file is a document (PDF, Word, PowerPoint, or Excel)
+  bool get isDocument => isPdf || isWord || isPowerPoint || isExcel;
+
+  /// Get file extension from name
+  String get _extension {
+    if (name == null || !name!.contains('.')) return '';
+    return name!.split('.').last;
+  }
+
+  /// Get file extension for display
+  String get fileExtension => _extension.toUpperCase();
+
+  /// Get file type label in Arabic
+  String get fileTypeLabel {
+    if (isPdf) return 'PDF';
+    if (isWord) return 'Word';
+    if (isPowerPoint) return 'PowerPoint';
+    if (isExcel) return 'Excel';
+    return fileExtension;
+  }
+
+  /// Get formatted file size
+  String get formattedSize {
+    if (size == null) return '';
+    if (size! < 1024) return '$size B';
+    if (size! < 1024 * 1024) return '${(size! / 1024).toStringAsFixed(1)} KB';
+    return '${(size! / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
 }
 
 class PostUser {

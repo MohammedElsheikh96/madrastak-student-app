@@ -109,14 +109,8 @@ flutter_launcher_icons:
 
 # Flutter Native Splash configuration
 flutter_native_splash:
-  color: "#ffffff"
-  image: "assets/images/splash_logo.png"
-  android_12:
-    # For Android 12+, use black background with black icon background
-    # to match the splash_logo.png which has black background
-    color: "#ffffff"
-    image: "assets/images/splash_logo.png"
-    icon_background_color: "#000000"
+  color: "#000000"
+  image: "assets/images/app_icon.png"
   ios: true
   android: true
   fullscreen: true

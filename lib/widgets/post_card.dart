@@ -1,18 +1,25 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/post.dart';
 import '../services/space_service.dart';
+import '../services/post_service.dart';
 import '../services/comment_signalr_service.dart';
 
 class PostCard extends StatefulWidget {
   final String? postId;
   final String authorName;
   final String authorImage;
+  final String? authorUserId;
+  final String? currentUserId;
   final String date;
   final String? title;
   final String content;
   final List<String>? images;
+  final List<PostFile>? files;
   final int likesCount;
   final int commentsCount;
   final int sharesCount;
@@ -24,16 +31,20 @@ class PostCard extends StatefulWidget {
   final VoidCallback? onCommentTap;
   final void Function(bool isLiked, int newCount)? onLikeChanged;
   final VoidCallback? onPostSheetClosed;
+  final VoidCallback? onPostDeleted;
 
   const PostCard({
     super.key,
     this.postId,
     required this.authorName,
     required this.authorImage,
+    this.authorUserId,
+    this.currentUserId,
     required this.date,
     this.title,
     required this.content,
     this.images,
+    this.files,
     this.likesCount = 0,
     this.commentsCount = 0,
     this.sharesCount = 0,
@@ -45,6 +56,7 @@ class PostCard extends StatefulWidget {
     this.onCommentTap,
     this.onLikeChanged,
     this.onPostSheetClosed,
+    this.onPostDeleted,
   });
 
   @override
@@ -53,9 +65,17 @@ class PostCard extends StatefulWidget {
 
 class _PostCardState extends State<PostCard> {
   final SpaceService _spaceService = SpaceService();
+  final PostService _postService = PostService();
   late bool _isLikedByMe;
   late int _likesCount;
   bool _isLikeLoading = false;
+  bool _isDeleting = false;
+
+  bool get _canDelete {
+    return widget.currentUserId != null &&
+        widget.authorUserId != null &&
+        widget.currentUserId == widget.authorUserId;
+  }
 
   @override
   void initState() {
@@ -109,6 +129,83 @@ class _PostCardState extends State<PostCard> {
       setState(() {
         _isLikeLoading = false;
       });
+    }
+  }
+
+  void _showDeleteConfirmation() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'حذف المنشور',
+          style: GoogleFonts.alexandria(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+          textAlign: TextAlign.right,
+        ),
+        content: Text(
+          'هل أنت متأكد من حذف هذا المنشور؟',
+          style: GoogleFonts.alexandria(fontSize: 14),
+          textAlign: TextAlign.right,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'إلغاء',
+              style: GoogleFonts.alexandria(color: Colors.grey),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deletePost();
+            },
+            child: Text(
+              'حذف',
+              style: GoogleFonts.alexandria(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deletePost() async {
+    if (widget.postId == null || _isDeleting) return;
+
+    setState(() {
+      _isDeleting = true;
+    });
+
+    final result = await _postService.deletePost(widget.postId!);
+
+    if (mounted) {
+      setState(() {
+        _isDeleting = false;
+      });
+
+      if (result.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'تم حذف المنشور بنجاح',
+              style: GoogleFonts.alexandria(),
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+        widget.onPostDeleted?.call();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.message, style: GoogleFonts.alexandria()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -182,7 +279,40 @@ class _PostCardState extends State<PostCard> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(Icons.more_horiz, color: Color(0xFF757575)),
+                if (_canDelete)
+                  PopupMenuButton<String>(
+                    icon: const Icon(
+                      Icons.more_horiz,
+                      color: Color(0xFF757575),
+                    ),
+                    onSelected: (value) {
+                      if (value == 'delete') {
+                        _showDeleteConfirmation();
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem<String>(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.delete_outline,
+                              color: Colors.red,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'حذف المنشور',
+                              style: GoogleFonts.alexandria(
+                                color: Colors.red,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
               ],
             ),
           ),
@@ -244,6 +374,14 @@ class _PostCardState extends State<PostCard> {
                 images: widget.images!,
                 onImageTap: (index) =>
                     _showImageGallery(context, widget.images!, index),
+              ),
+            ),
+          // Document files
+          if (widget.files != null && widget.files!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 8),
+              child: DocumentFilesList(
+                files: widget.files!.where((f) => f.isDocument).toList(),
               ),
             ),
           // Post actions
@@ -366,7 +504,9 @@ class _PostCardState extends State<PostCard> {
         postId: widget.postId!,
         currentUserName: widget.currentUserName,
         currentUserImage: widget.currentUserImage,
+        currentUserId: widget.currentUserId,
         onClose: widget.onPostSheetClosed,
+        onPostDeleted: widget.onPostDeleted,
       ),
     );
   }
@@ -535,14 +675,18 @@ class SinglePostSheet extends StatefulWidget {
   final String postId;
   final String currentUserName;
   final String? currentUserImage;
+  final String? currentUserId;
   final VoidCallback? onClose;
+  final VoidCallback? onPostDeleted;
 
   const SinglePostSheet({
     super.key,
     required this.postId,
     required this.currentUserName,
     this.currentUserImage,
+    this.currentUserId,
     this.onClose,
+    this.onPostDeleted,
   });
 
   @override
@@ -554,11 +698,26 @@ class _SinglePostSheetState extends State<SinglePostSheet> {
   final TextEditingController _replyController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final SpaceService _spaceService = SpaceService();
+  final PostService _postService = PostService();
 
   String? _replyingToCommentId;
   bool _isLoading = true;
   String? _error;
   PostDetail? _postDetail;
+  bool _isDeleting = false;
+
+  bool get _canDelete {
+    if (_postDetail == null || widget.currentUserId == null) return false;
+    final authorUserId =
+        _postDetail!.post.user?.id ?? _postDetail!.post.createdBy;
+    return authorUserId != null && widget.currentUserId == authorUserId;
+  }
+
+  /// Check if the current user can delete/edit a comment
+  bool _canDeleteComment(PostComment comment) {
+    if (widget.currentUserId == null || comment.createdBy == null) return false;
+    return widget.currentUserId == comment.createdBy;
+  }
 
   // Like state for post
   bool _isPostLikedByMe = false;
@@ -638,7 +797,7 @@ class _SinglePostSheetState extends State<SinglePostSheet> {
   Future<void> _connectToSignalR() async {
     // Use static token for now (same as SpaceService)
     const token =
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjJiODVmZTk2LTU3ZjgtNDBiNi05NjAxLTMyYTA3Mjg4NmUxMSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvdXNlcmRhdGEiOiJjNTA2MTY3My01YjVmLTRlNWUtYWI3OC1kOWY1MWVlZjNkZDIiLCJuYW1lIjoi2LnYqNiv2KfZhNmH2KfYr9mJINmF2K3ZhdivINi52KjYr9in2YTZh9in2K_ZiSDYudmE2Ykg2KfZhNi02YrZiNmJIiwiZW1haWwiOiIxNDU0MUBzYWJyb2FkLm1vZS5lZHUuZWciLCJwaG9uZV9udW1iZXIiOiIiLCJwcm9maWxlX3BpY3R1cmVfdXJsIjoiIiwic3RhZ2VfbmFtZSI6Itin2YTYqti52YTZitmFINin2YTYp9i52K_Yp9iv2YogIiwiZ3JhZGVfbmFtZSI6Itin2YTYtdmBINin2YTYq9in2YbZiiDYp9mE2KfYudiv2KfYr9mKIiwiY291bnRyeV9uYW1lIjoi2KXZiti32KfZhNmK2KciLCJuYmYiOjE3Njk1MTQ3MTEsImV4cCI6MTc2OTg2MDMxMSwiaWF0IjoxNzY5NTE0NzExfQ.uLbi6Ih3MsUq-Hyastmj2HP7IPpw9EgGz01gvsi3NiY';
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjJiODVmZTk2LTU3ZjgtNDBiNi05NjAxLTMyYTA3Mjg4NmUxMSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvdXNlcmRhdGEiOiJjNTA2MTY3My01YjVmLTRlNWUtYWI3OC1kOWY1MWVlZjNkZDIiLCJuYW1lIjoi2LnYqNiv2KfZhNmH2KfYr9mJINmF2K3ZhdivINi52KjYr9in2YTZh9in2K_ZiSDYudmE2Ykg2KfZhNi02YrZiNmJIiwiZW1haWwiOiIxNDU0MUBzYWJyb2FkLm1vZS5lZHUuZWciLCJwaG9uZV9udW1iZXIiOiIiLCJwcm9maWxlX3BpY3R1cmVfdXJsIjoiIiwic3RhZ2VfbmFtZSI6Itin2YTYqti52YTZitmFINin2YTYp9i52K_Yp9iv2YogIiwiZ3JhZGVfbmFtZSI6Itin2YTYtdmBINin2YTYq9in2YbZiiDYp9mE2KfYudiv2KfYr9mKIiwiY291bnRyeV9uYW1lIjoi2KXZiti32KfZhNmK2KciLCJuYmYiOjE3NzA1NTU0OTMsImV4cCI6MTc3MDkwMTA5MywiaWF0IjoxNzcwNTU1NDkzfQ.y0Bofp8ubOD6-6cE0Pudi0TURooNIrvGe756Dm_mbjg';
 
     _signalRService = CommentSignalRService(
       postId: widget.postId,
@@ -944,6 +1103,359 @@ class _SinglePostSheetState extends State<SinglePostSheet> {
     }
   }
 
+  void _showDeleteConfirmation() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'حذف المنشور',
+          style: GoogleFonts.alexandria(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+          textAlign: TextAlign.right,
+        ),
+        content: Text(
+          'هل أنت متأكد من حذف هذا المنشور؟',
+          style: GoogleFonts.alexandria(fontSize: 14),
+          textAlign: TextAlign.right,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'إلغاء',
+              style: GoogleFonts.alexandria(color: Colors.grey),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deletePost();
+            },
+            child: Text(
+              'حذف',
+              style: GoogleFonts.alexandria(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deletePost() async {
+    if (_postDetail == null || _isDeleting) return;
+
+    setState(() {
+      _isDeleting = true;
+    });
+
+    final result = await _postService.deletePost(_postDetail!.post.id!);
+
+    if (mounted) {
+      setState(() {
+        _isDeleting = false;
+      });
+
+      if (result.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'تم حذف المنشور بنجاح',
+              style: GoogleFonts.alexandria(),
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+        // Close the sheet
+        Navigator.pop(context);
+        // Notify parent to refresh
+        widget.onPostDeleted?.call();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.message, style: GoogleFonts.alexandria()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Show comment actions (Copy, Delete, Edit)
+  void _showCommentActions(PostComment comment) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Copy option
+              ListTile(
+                leading: const Icon(Icons.copy, color: Color(0xFF0F6EB7)),
+                title: Text(
+                  'نسخ',
+                  style: GoogleFonts.alexandria(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.right,
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _copyComment(comment);
+                },
+              ),
+              // Edit option
+              ListTile(
+                leading: const Icon(
+                  Icons.edit_outlined,
+                  color: Color(0xFF0F6EB7),
+                ),
+                title: Text(
+                  'تعديل',
+                  style: GoogleFonts.alexandria(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.right,
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showEditCommentDialog(comment);
+                },
+              ),
+              // Delete option
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: Text(
+                  'حذف',
+                  style: GoogleFonts.alexandria(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.red,
+                  ),
+                  textAlign: TextAlign.right,
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showDeleteCommentConfirmation(comment);
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Copy comment content to clipboard
+  void _copyComment(PostComment comment) {
+    if (comment.content != null) {
+      Clipboard.setData(ClipboardData(text: comment.content!));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تم نسخ التعليق', style: GoogleFonts.alexandria()),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  /// Show delete comment confirmation dialog
+  void _showDeleteCommentConfirmation(PostComment comment) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'حذف التعليق',
+          style: GoogleFonts.alexandria(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+          textAlign: TextAlign.right,
+        ),
+        content: Text(
+          'هل أنت متأكد من حذف هذا التعليق؟',
+          style: GoogleFonts.alexandria(fontSize: 14),
+          textAlign: TextAlign.right,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'إلغاء',
+              style: GoogleFonts.alexandria(color: Colors.grey),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteComment(comment);
+            },
+            child: Text(
+              'حذف',
+              style: GoogleFonts.alexandria(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Delete a comment
+  Future<void> _deleteComment(PostComment comment) async {
+    if (comment.id == null) return;
+
+    final result = await _spaceService.deleteComment(comment.id!);
+
+    if (mounted) {
+      if (result.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.message, style: GoogleFonts.alexandria()),
+            backgroundColor: Colors.green,
+          ),
+        );
+        // Refresh the post data to get updated comments
+        await _loadPostData();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.message, style: GoogleFonts.alexandria()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Show edit comment dialog
+  void _showEditCommentDialog(PostComment comment) {
+    final TextEditingController editController = TextEditingController(
+      text: comment.content ?? '',
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) => WillPopScope(
+        onWillPop: () async {
+          editController.dispose();
+          return true;
+        },
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'تعديل التعليق',
+            style: GoogleFonts.alexandria(
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
+            textAlign: TextAlign.right,
+          ),
+          content: TextField(
+            controller: editController,
+            maxLines: 4,
+            textAlign: TextAlign.right,
+            textDirection: TextDirection.rtl,
+            decoration: InputDecoration(
+              hintText: 'اكتب تعليقك هنا...',
+              hintStyle: GoogleFonts.alexandria(
+                fontSize: 14,
+                color: Colors.grey,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFF0F6EB7)),
+              ),
+            ),
+            style: GoogleFonts.alexandria(fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: Text(
+                'إلغاء',
+                style: GoogleFonts.alexandria(color: Colors.grey),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                final newContent = editController.text.trim();
+                Navigator.pop(context);
+                if (newContent.isNotEmpty) {
+                  _updateComment(comment, newContent);
+                }
+              },
+              child: Text(
+                'حفظ',
+                style: GoogleFonts.alexandria(color: const Color(0xFF0F6EB7)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Update a comment
+  Future<void> _updateComment(PostComment comment, String newContent) async {
+    if (comment.id == null) return;
+
+    final result = await _spaceService.updateComment(
+      commentId: comment.id!,
+      content: newContent,
+    );
+
+    if (mounted) {
+      if (result.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.message, style: GoogleFonts.alexandria()),
+            backgroundColor: Colors.green,
+          ),
+        );
+        // Refresh the post data to get updated comments
+        await _loadPostData();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.message, style: GoogleFonts.alexandria()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   void dispose() {
     _commentController.dispose();
@@ -1124,7 +1636,37 @@ class _SinglePostSheetState extends State<SinglePostSheet> {
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.more_horiz, color: Color(0xFF757575)),
+              if (_canDelete)
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_horiz, color: Color(0xFF757575)),
+                  onSelected: (value) {
+                    if (value == 'delete') {
+                      _showDeleteConfirmation();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem<String>(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.delete_outline,
+                            color: Colors.red,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'حذف المنشور',
+                            style: GoogleFonts.alexandria(
+                              color: Colors.red,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
             ],
           ),
         ),
@@ -1183,6 +1725,12 @@ class _SinglePostSheetState extends State<SinglePostSheet> {
           Padding(
             padding: const EdgeInsets.all(16),
             child: _buildPostImagesGrid(images),
+          ),
+        // Document files
+        if (post.documentFiles.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 8),
+            child: DocumentFilesList(files: post.documentFiles),
           ),
         // Post actions
         Padding(
@@ -1503,23 +2051,29 @@ class _SinglePostSheetState extends State<SinglePostSheet> {
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
               Flexible(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF5F5F5),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text(
-                    comment.content ?? '',
-                    textAlign: TextAlign.right,
-                    textDirection: TextDirection.rtl,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF333333),
-                      height: 1.4,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onLongPress: _canDeleteComment(comment)
+                      ? () => _showCommentActions(comment)
+                      : null,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5F5F5),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      comment.content ?? '',
+                      textAlign: TextAlign.right,
+                      textDirection: TextDirection.rtl,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF333333),
+                        height: 1.4,
+                      ),
                     ),
                   ),
                 ),
@@ -2093,6 +2647,241 @@ class _LocalImageGalleryViewerState extends State<LocalImageGalleryViewer> {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Document File Card Widget - displays document files (PDF, Word, PowerPoint, Excel)
+/// Matches the web design with light background and colored icon
+class DocumentFileCard extends StatelessWidget {
+  final PostFile file;
+
+  const DocumentFileCard({super.key, required this.file});
+
+  /// Get card background color based on file type (light version)
+  Color get _cardBackgroundColor {
+    if (file.isPdf) return const Color(0xFFFFEBEE); // Light red
+    if (file.isWord) return const Color(0xFFE3F2FD); // Light blue
+    if (file.isPowerPoint) return const Color(0xFFFFF3E0); // Light orange
+    if (file.isExcel) return const Color(0xFFE8F5E9); // Light green
+    return const Color(0xFFF5F5F5); // Light gray
+  }
+
+  /// Get icon background color based on file type (dark version)
+  Color get _iconBackgroundColor {
+    if (file.isPdf) return const Color(0xFFD32F2F); // Dark red
+    if (file.isWord) return const Color(0xFF1565C0); // Dark blue
+    if (file.isPowerPoint) return const Color(0xFFE65100); // Dark orange
+    if (file.isExcel) return const Color(0xFF2E7D32); // Dark green
+    return const Color(0xFF757575); // Gray
+  }
+
+  /// Get download button background color (light version of icon color)
+  Color get _downloadButtonColor {
+    if (file.isPdf) return const Color(0xFFFFCDD2); // Lighter red
+    if (file.isWord) return const Color(0xFFBBDEFB); // Lighter blue
+    if (file.isPowerPoint) return const Color(0xFFFFE0B2); // Lighter orange
+    if (file.isExcel) return const Color(0xFFC8E6C9); // Lighter green
+    return const Color(0xFFE0E0E0); // Light gray
+  }
+
+  /// Get download icon color
+  Color get _downloadIconColor {
+    if (file.isPdf) return const Color(0xFFD32F2F);
+    if (file.isWord) return const Color(0xFF1565C0);
+    if (file.isPowerPoint) return const Color(0xFFE65100);
+    if (file.isExcel) return const Color(0xFF2E7D32);
+    return const Color(0xFF757575);
+  }
+
+  /// Get text color for type label
+  Color get _typeLabelColor {
+    if (file.isPdf) return const Color(0xFFB71C1C);
+    if (file.isWord) return const Color(0xFF0D47A1);
+    if (file.isPowerPoint) return const Color(0xFFE65100);
+    if (file.isExcel) return const Color(0xFF1B5E20);
+    return const Color(0xFF616161);
+  }
+
+  /// Get icon for file type
+  IconData get _fileIcon {
+    if (file.isPdf) return Icons.picture_as_pdf;
+    if (file.isWord) return Icons.description;
+    if (file.isPowerPoint) return Icons.slideshow;
+    if (file.isExcel) return Icons.table_chart;
+    return Icons.insert_drive_file;
+  }
+
+  /// Open file in browser/external app
+  Future<void> _openFile(BuildContext context) async {
+    if (file.path == null || file.path!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'رابط الملف غير متوفر',
+            style: GoogleFonts.alexandria(),
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final uri = Uri.parse(file.path!);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'لا يمكن فتح الملف',
+                style: GoogleFonts.alexandria(),
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'حدث خطأ في فتح الملف',
+              style: GoogleFonts.alexandria(),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: _cardBackgroundColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _openFile(context),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                // File type icon (right side)
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: _iconBackgroundColor,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(_fileIcon, color: Colors.white, size: 28),
+                ),
+                const SizedBox(width: 12),
+                // File info (center)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        file.name ?? 'ملف',
+                        style: GoogleFonts.alexandria(
+                          color: const Color(0xFF333333),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        textDirection: TextDirection.rtl,
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        children: [
+                          if (file.formattedSize.isNotEmpty) ...[
+                            Text(
+                              file.formattedSize,
+                              style: GoogleFonts.alexandria(
+                                color: const Color(0xFF757575),
+                                fontSize: 11,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _iconBackgroundColor.withValues(
+                                alpha: 0.15,
+                              ),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              file.fileTypeLabel,
+                              style: GoogleFonts.alexandria(
+                                color: _typeLabelColor,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // // Download button (left side)
+                // Container(
+                //   width: 40,
+                //   height: 40,
+                //   decoration: BoxDecoration(
+                //     color: _downloadButtonColor,
+                //     shape: BoxShape.circle,
+                //   ),
+                //   child: Icon(
+                //     Icons.download_rounded,
+                //     color: _downloadIconColor,
+                //     size: 20,
+                //   ),
+                // ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Document Files List Widget - displays a list of document files
+class DocumentFilesList extends StatelessWidget {
+  final List<PostFile> files;
+
+  const DocumentFilesList({super.key, required this.files});
+
+  @override
+  Widget build(BuildContext context) {
+    if (files.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        children: files.map((file) => DocumentFileCard(file: file)).toList(),
       ),
     );
   }

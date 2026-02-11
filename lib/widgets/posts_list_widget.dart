@@ -32,6 +32,9 @@ class PostsListWidget extends StatefulWidget {
   /// Current user image for post creation
   final String? userImage;
 
+  /// Current user ID for checking post ownership
+  final String? currentUserId;
+
   const PostsListWidget({
     super.key,
     required this.course,
@@ -42,6 +45,7 @@ class PostsListWidget extends StatefulWidget {
     this.showCourseHeader = true,
     required this.userName,
     this.userImage,
+    this.currentUserId,
   });
 
   @override
@@ -361,10 +365,13 @@ class _PostsListWidgetState extends State<PostsListWidget> {
                   postId: post.id,
                   authorName: post.authorName,
                   authorImage: post.authorImage,
+                  authorUserId: post.user?.id,
+                  currentUserId: widget.currentUserId,
                   date: post.formattedDate,
                   title: post.title,
                   content: post.plainContent,
                   images: post.images.isNotEmpty ? post.images : null,
+                  files: post.files.isNotEmpty ? post.files : null,
                   isCoursPost: false,
                   isPinned: post.isPinned,
                   likesCount: post.likesCount,
@@ -398,6 +405,7 @@ class _PostsListWidgetState extends State<PostsListWidget> {
                     });
                   },
                   onPostSheetClosed: _refreshPosts,
+                  onPostDeleted: _refreshPosts,
                 ),
               );
             }

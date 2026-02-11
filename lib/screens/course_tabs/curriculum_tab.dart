@@ -433,7 +433,7 @@ class _CurriculumTabState extends State<CurriculumTab> {
                     ),
                   ),
                 // Icon overlay for content (video, PDF, or live)
-                if (lo.type == 4 || isLiveVideo)
+                if (lo.type == 4)
                   Positioned.fill(
                     child: Container(
                       decoration: BoxDecoration(

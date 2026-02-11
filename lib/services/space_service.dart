@@ -11,7 +11,7 @@ class SpaceService {
 
   // Static token for testing - same as ApiClient
   static const String _staticToken =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjJiODVmZTk2LTU3ZjgtNDBiNi05NjAxLTMyYTA3Mjg4NmUxMSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvdXNlcmRhdGEiOiJjNTA2MTY3My01YjVmLTRlNWUtYWI3OC1kOWY1MWVlZjNkZDIiLCJuYW1lIjoi2LnYqNiv2KfZhNmH2KfYr9mJINmF2K3ZhdivINi52KjYr9in2YTZh9in2K_ZiSDYudmE2Ykg2KfZhNi02YrZiNmJIiwiZW1haWwiOiIxNDU0MUBzYWJyb2FkLm1vZS5lZHUuZWciLCJwaG9uZV9udW1iZXIiOiIiLCJwcm9maWxlX3BpY3R1cmVfdXJsIjoiIiwic3RhZ2VfbmFtZSI6Itin2YTYqti52YTZitmFINin2YTYp9i52K_Yp9iv2YogIiwiZ3JhZGVfbmFtZSI6Itin2YTYtdmBINin2YTYq9in2YbZiiDYp9mE2KfYudiv2KfYr9mKIiwiY291bnRyeV9uYW1lIjoi2KXZiti32KfZhNmK2KciLCJuYmYiOjE3Njk1MTQ3MTEsImV4cCI6MTc2OTg2MDMxMSwiaWF0IjoxNzY5NTE0NzExfQ.uLbi6Ih3MsUq-Hyastmj2HP7IPpw9EgGz01gvsi3NiY';
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjJiODVmZTk2LTU3ZjgtNDBiNi05NjAxLTMyYTA3Mjg4NmUxMSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvdXNlcmRhdGEiOiJjNTA2MTY3My01YjVmLTRlNWUtYWI3OC1kOWY1MWVlZjNkZDIiLCJuYW1lIjoi2LnYqNiv2KfZhNmH2KfYr9mJINmF2K3ZhdivINi52KjYr9in2YTZh9in2K_ZiSDYudmE2Ykg2KfZhNi02YrZiNmJIiwiZW1haWwiOiIxNDU0MUBzYWJyb2FkLm1vZS5lZHUuZWciLCJwaG9uZV9udW1iZXIiOiIiLCJwcm9maWxlX3BpY3R1cmVfdXJsIjoiIiwic3RhZ2VfbmFtZSI6Itin2YTYqti52YTZitmFINin2YTYp9i52K_Yp9iv2YogIiwiZ3JhZGVfbmFtZSI6Itin2YTYtdmBINin2YTYq9in2YbZiiDYp9mE2KfYudiv2KfYr9mKIiwiY291bnRyeV9uYW1lIjoi2KXZiti32KfZhNmK2KciLCJuYmYiOjE3NzA1NTU0OTMsImV4cCI6MTc3MDkwMTA5MywiaWF0IjoxNzcwNTU1NDkzfQ.y0Bofp8ubOD6-6cE0Pudi0TURooNIrvGe756Dm_mbjg';
 
   Future<String?> _getToken() async {
     return _staticToken;
@@ -442,6 +442,125 @@ class SpaceService {
     }
   }
 
+  /// Update a comment
+  Future<CommentActionResult> updateComment({
+    required String commentId,
+    required String content,
+  }) async {
+    try {
+      final token = await _getToken();
+      if (token == null) {
+        return CommentActionResult(
+          success: false,
+          message: 'غير مصرح - يرجى تسجيل الدخول',
+        );
+      }
+
+      final uri = Uri.parse('$_baseUrl/Comment/Update');
+      final requestBody = {'commentId': commentId, 'content': content};
+
+      print('🔄 Update Comment Request:');
+      print('   URL: $uri');
+      print('   Body: $requestBody');
+
+      final response = await http.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      print('📥 Update Comment Response:');
+      print('   Status: ${response.statusCode}');
+      print('   Body: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        return CommentActionResult(
+          success: true,
+          message: 'تم تحديث التعليق بنجاح',
+        );
+      } else if (response.statusCode == 401) {
+        return CommentActionResult(
+          success: false,
+          message: 'غير مصرح - يرجى تسجيل الدخول مرة أخرى',
+        );
+      } else if (response.statusCode == 403) {
+        return CommentActionResult(
+          success: false,
+          message: 'غير مصرح - لا يمكنك تعديل هذا التعليق',
+        );
+      } else if (response.statusCode == 405) {
+        return CommentActionResult(
+          success: false,
+          message: 'خطأ 405: الطريقة غير مسموحة - تحقق من endpoint التحديث',
+        );
+      } else {
+        return CommentActionResult(
+          success: false,
+          message: 'حدث خطأ: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      print('❌ Update Comment Error: $e');
+      return CommentActionResult(
+        success: false,
+        message: 'حدث خطأ في الاتصال: $e',
+      );
+    }
+  }
+
+  /// Delete a comment
+  Future<CommentActionResult> deleteComment(String commentId) async {
+    try {
+      final token = await _getToken();
+      if (token == null) {
+        return CommentActionResult(
+          success: false,
+          message: 'غير مصرح - يرجى تسجيل الدخول',
+        );
+      }
+
+      final uri = Uri.parse('$_baseUrl/Comment/Delete/$commentId');
+
+      final response = await http.delete(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        return CommentActionResult(
+          success: true,
+          message: 'تم حذف التعليق بنجاح',
+        );
+      } else if (response.statusCode == 401) {
+        return CommentActionResult(
+          success: false,
+          message: 'غير مصرح - يرجى تسجيل الدخول مرة أخرى',
+        );
+      } else if (response.statusCode == 403) {
+        return CommentActionResult(
+          success: false,
+          message: 'غير مصرح - لا يمكنك حذف هذا التعليق',
+        );
+      } else {
+        return CommentActionResult(
+          success: false,
+          message: 'حدث خطأ: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      return CommentActionResult(
+        success: false,
+        message: 'حدث خطأ في الاتصال: $e',
+      );
+    }
+  }
+
   /// Create a new post with optional files
   /// Uses multipart/form-data to upload files
   Future<CreatePostResult> createPost({
@@ -557,6 +676,13 @@ class CreateCommentResult {
     required this.message,
     this.comment,
   });
+}
+
+class CommentActionResult {
+  final bool success;
+  final String message;
+
+  CommentActionResult({required this.success, required this.message});
 }
 
 class PostsResult {

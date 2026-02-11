@@ -204,9 +204,9 @@ class TaskUser {
 
 /// Main Task model for course tasks
 class Task {
-  final int taskId;
+  final String taskId; // Changed to String for new API
   final String taskName;
-  final int referenceType; // 1,2 = تدريب/واجب (purple), 3 = شرح (orange), 5 = نقاش (blue)
+  final int referenceType; // 1 = Quiz, 3 = Learning Object, 5 = Discussion
   final String referenceTypeName;
   final String? referenceTypeNameAr;
   final String referenceId;
@@ -219,11 +219,13 @@ class Task {
   final String? openDate;
   final bool? isCompleted;
   final String? completionDate;
+  final bool isOverDue;
   final List<String> tags;
   final int courseId;
   final String? courseName;
   final String? courseArabicName;
   final String? courseImage;
+  final String? thumbnailUrl;
 
   // Task details - one of these will be populated based on referenceType
   final TaskDetailsLO? taskDetailsLO;
@@ -246,11 +248,13 @@ class Task {
     this.openDate,
     this.isCompleted,
     this.completionDate,
+    this.isOverDue = false,
     required this.tags,
     required this.courseId,
     this.courseName,
     this.courseArabicName,
     this.courseImage,
+    this.thumbnailUrl,
     this.taskDetailsLO,
     this.taskDetailsQuiz,
     this.taskDetailsDiscussion,
@@ -258,29 +262,37 @@ class Task {
 
   factory Task.fromJson(Map<String, dynamic> json, int refType) {
     final course = json['course'] as Map<String, dynamic>?;
-    final taskDetails = json['taskDetails'] as Map<String, dynamic>?;
+    final content = json['content'] as Map<String, dynamic>?;
+    final contentDetails = content?['contentDetails'] as Map<String, dynamic>?;
 
     TaskDetailsLO? detailsLO;
     TaskDetailsQuiz? detailsQuiz;
     TaskDetailsDiscussion? detailsDiscussion;
 
-    if (taskDetails != null) {
+    // Parse content details based on reference type
+    if (contentDetails != null) {
       if (refType == 3) {
-        detailsLO = TaskDetailsLO.fromJson(taskDetails);
+        // Learning Object
+        detailsLO = TaskDetailsLO.fromJson(contentDetails);
       } else if (refType == 1 || refType == 2) {
-        detailsQuiz = TaskDetailsQuiz.fromJson(taskDetails);
+        // Quiz
+        detailsQuiz = TaskDetailsQuiz.fromJson(contentDetails);
       } else if (refType == 5) {
-        detailsDiscussion = TaskDetailsDiscussion.fromJson(taskDetails);
+        // Discussion
+        detailsDiscussion = TaskDetailsDiscussion.fromJson(contentDetails);
       }
     }
 
+    // Get thumbnail from content
+    final thumbnailUrl = content?['thumbNailUrl'] as String?;
+
     return Task(
-      taskId: json['taskId'] as int,
+      taskId: json['id']?.toString() ?? json['taskId']?.toString() ?? '',
       taskName: json['taskName'] as String? ?? '',
-      referenceType: json['refrenceType'] as int? ?? refType,
+      referenceType: json['taskType'] as int? ?? json['refrenceType'] as int? ?? refType,
       referenceTypeName: json['refrenceTypeName'] as String? ?? '',
       referenceTypeNameAr: json['refrenceTypeNameAr'] as String?,
-      referenceId: json['refrenceId']?.toString() ?? '',
+      referenceId: json['referenceId']?.toString() ?? json['refrenceId']?.toString() ?? '',
       description: json['description'] as String?,
       startDate: json['startDate'] as String?,
       dueDate: json['dueDate'] as String?,
@@ -290,6 +302,7 @@ class Task {
       openDate: json['openDate'] as String?,
       isCompleted: json['isCompleted'] as bool?,
       completionDate: json['completionDate'] as String?,
+      isOverDue: json['isOverDue'] as bool? ?? false,
       tags: (json['tags'] as List<dynamic>?)
               ?.map((t) => t.toString())
               .toList() ??
@@ -298,6 +311,7 @@ class Task {
       courseName: course?['name'] as String?,
       courseArabicName: course?['arabicName'] as String?,
       courseImage: course?['image'] as String?,
+      thumbnailUrl: thumbnailUrl,
       taskDetailsLO: detailsLO,
       taskDetailsQuiz: detailsQuiz,
       taskDetailsDiscussion: detailsDiscussion,
@@ -378,6 +392,10 @@ class Task {
 
   /// Get task image URL
   String? get imageUrl {
+    // First try thumbnailUrl from content
+    if (thumbnailUrl != null && thumbnailUrl!.isNotEmpty) {
+      return thumbnailUrl;
+    }
     if (referenceType == 3 && taskDetailsLO != null) {
       return taskDetailsLO!.displayImage;
     } else if ((referenceType == 1 || referenceType == 2) &&
@@ -418,26 +436,71 @@ class TaskGroup {
   }
 }
 
+/// Pagination info from API response
+class TaskPagination {
+  final int currentPage;
+  final int totalPages;
+  final int pageSize;
+  final int totalCount;
+  final bool hasPrevious;
+  final bool hasNext;
+
+  TaskPagination({
+    required this.currentPage,
+    required this.totalPages,
+    required this.pageSize,
+    required this.totalCount,
+    required this.hasPrevious,
+    required this.hasNext,
+  });
+
+  factory TaskPagination.fromJson(Map<String, dynamic> json) {
+    return TaskPagination(
+      currentPage: json['currentPage'] as int? ?? 1,
+      totalPages: json['totalPages'] as int? ?? 1,
+      pageSize: json['pageSize'] as int? ?? 50,
+      totalCount: json['totalCount'] as int? ?? 0,
+      hasPrevious: json['hasPrevious'] as bool? ?? false,
+      hasNext: json['hasNext'] as bool? ?? false,
+    );
+  }
+}
+
 /// Response model for tasks by day API
 class TasksByDayResponse {
-  final bool status;
+  final bool success;
+  final int statusCode;
   final String message;
   final List<TaskGroup> taskGroups;
+  final TaskPagination? pagination;
 
   TasksByDayResponse({
-    required this.status,
+    required this.success,
+    this.statusCode = 200,
     required this.message,
     required this.taskGroups,
+    this.pagination,
   });
 
   factory TasksByDayResponse.fromJson(Map<String, dynamic> json) {
+    // Handle both old format (status/returnObject) and new format (success/data)
+    final isNewFormat = json.containsKey('success');
+
     return TasksByDayResponse(
-      status: json['status'] as bool? ?? false,
+      success: isNewFormat
+          ? (json['success'] as bool? ?? false)
+          : (json['status'] as bool? ?? false),
+      statusCode: json['statusCode'] as int? ?? 200,
       message: json['message'] as String? ?? '',
-      taskGroups: (json['returnObject'] as List<dynamic>?)
+      taskGroups: (isNewFormat
+              ? json['data'] as List<dynamic>?
+              : json['returnObject'] as List<dynamic>?)
               ?.map((g) => TaskGroup.fromJson(g as Map<String, dynamic>))
               .toList() ??
           [],
+      pagination: json['pagination'] != null
+          ? TaskPagination.fromJson(json['pagination'] as Map<String, dynamic>)
+          : null,
     );
   }
 

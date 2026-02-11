@@ -18,6 +18,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   final ScrollController _scrollController = ScrollController();
   String _currentUserName = 'مستخدم';
   String? _currentUserImage;
+  String? _currentUserId;
 
   @override
   void initState() {
@@ -33,6 +34,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       setState(() {
         _currentUserName = studentData.userBasicInfo.name ?? 'مستخدم';
         _currentUserImage = studentData.userBasicInfo.profilePicture;
+        _currentUserId = studentData.id;
       });
     }
   }
@@ -307,6 +309,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
         postId: postId,
         currentUserName: _currentUserName,
         currentUserImage: _currentUserImage,
+        currentUserId: _currentUserId,
+        onPostDeleted: _loadNotifications,
       ),
     );
   }

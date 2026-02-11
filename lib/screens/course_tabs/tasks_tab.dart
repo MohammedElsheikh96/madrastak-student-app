@@ -44,7 +44,7 @@ class _TasksTabState extends State<TasksTab> {
         widget.course.id,
       );
 
-      if (response != null && response.status) {
+      if (response != null && response.success) {
         setState(() {
           _tasksResponse = response;
           _isLoading = false;
@@ -533,7 +533,9 @@ class _TasksTabState extends State<TasksTab> {
         postId: postId,
         currentUserName: 'المستخدم', // TODO: Get from auth service
         currentUserImage: null,
+        currentUserId: _userId,
         onClose: null,
+        onPostDeleted: _loadTasks,
       ),
     );
 

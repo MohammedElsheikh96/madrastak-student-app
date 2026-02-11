@@ -113,7 +113,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 ? const Center(
                     child: CircularProgressIndicator(color: Color(0xFF1976D2)),
                   )
-                : _studentData == null
+                : _studentData != null
                 ? const Center(
                     child: Text(
                       'لا توجد بيانات',
@@ -150,7 +150,7 @@ class _ProfileTabState extends State<ProfileTab> {
     final userName = _studentData?.userBasicInfo.name ?? 'مستخدم';
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -200,7 +200,7 @@ class _ProfileTabState extends State<ProfileTab> {
           Text(
             userName,
             style: const TextStyle(
-              fontSize: 22,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: Color(0xFF333333),
             ),
@@ -237,7 +237,7 @@ class _ProfileTabState extends State<ProfileTab> {
           const Text(
             'المعلومات الشخصية',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: Color(0xFF333333),
             ),
@@ -308,7 +308,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 value,
                 style: const TextStyle(
                   fontSize: 15,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w400,
                   color: Color(0xFF333333),
                 ),
               ),
