@@ -128,8 +128,18 @@ class Post {
       } else {
         // Format as date
         final months = [
-          'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-          'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+          'يناير',
+          'فبراير',
+          'مارس',
+          'أبريل',
+          'مايو',
+          'يونيو',
+          'يوليو',
+          'أغسطس',
+          'سبتمبر',
+          'أكتوبر',
+          'نوفمبر',
+          'ديسمبر',
         ];
         return '${date.day} ${months[date.month - 1]}، ${date.year}';
       }
@@ -168,13 +178,7 @@ class PostFile {
   final String? path;
   final String? externalId;
 
-  PostFile({
-    this.name,
-    this.type,
-    this.size,
-    this.path,
-    this.externalId,
-  });
+  PostFile({this.name, this.type, this.size, this.path, this.externalId});
 
   factory PostFile.fromJson(Map<String, dynamic> json) {
     return PostFile(
@@ -207,25 +211,31 @@ class PostFile {
   /// Check if file is a Word document
   bool get isWord {
     final ext = _extension.toLowerCase();
-    return ext == 'doc' || ext == 'docx' ||
-           type == 'application/msword' ||
-           type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    return ext == 'doc' ||
+        ext == 'docx' ||
+        type == 'application/msword' ||
+        type ==
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
   }
 
   /// Check if file is a PowerPoint presentation
   bool get isPowerPoint {
     final ext = _extension.toLowerCase();
-    return ext == 'ppt' || ext == 'pptx' ||
-           type == 'application/vnd.ms-powerpoint' ||
-           type == 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    return ext == 'ppt' ||
+        ext == 'pptx' ||
+        type == 'application/vnd.ms-powerpoint' ||
+        type ==
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation';
   }
 
   /// Check if file is an Excel spreadsheet
   bool get isExcel {
     final ext = _extension.toLowerCase();
-    return ext == 'xls' || ext == 'xlsx' ||
-           type == 'application/vnd.ms-excel' ||
-           type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    return ext == 'xls' ||
+        ext == 'xlsx' ||
+        type == 'application/vnd.ms-excel' ||
+        type ==
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   }
 
   /// Check if file is a document (PDF, Word, PowerPoint, or Excel)
@@ -260,12 +270,14 @@ class PostFile {
 
 class PostUser {
   final String? id;
+  final String? subId;
   final String? profileImageUrl;
   final String? name;
   final String? profileSpaceId;
 
   PostUser({
     this.id,
+    this.subId,
     this.profileImageUrl,
     this.name,
     this.profileSpaceId,
@@ -274,6 +286,7 @@ class PostUser {
   factory PostUser.fromJson(Map<String, dynamic> json) {
     return PostUser(
       id: json['id'],
+      subId: json['subId'],
       profileImageUrl: json['profileImageUrl'],
       name: json['name'],
       profileSpaceId: json['profileSpaceId'],
@@ -283,6 +296,7 @@ class PostUser {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'subId': subId,
       'profileImageUrl': profileImageUrl,
       'name': name,
       'profileSpaceId': profileSpaceId,
@@ -294,10 +308,7 @@ class PostsPagedResponse {
   final List<Post> posts;
   final int totalCount;
 
-  PostsPagedResponse({
-    required this.posts,
-    required this.totalCount,
-  });
+  PostsPagedResponse({required this.posts, required this.totalCount});
 
   factory PostsPagedResponse.fromJson(Map<String, dynamic> json) {
     List<Post> postsList = [];
@@ -307,10 +318,7 @@ class PostsPagedResponse {
       }
     }
 
-    return PostsPagedResponse(
-      posts: postsList,
-      totalCount: json['count'] ?? 0,
-    );
+    return PostsPagedResponse(posts: postsList, totalCount: json['count'] ?? 0);
   }
 }
 
@@ -326,6 +334,7 @@ class PostComment {
   final bool isLikedByMe;
   final String? created;
   final String? createdBy;
+  final String? creatorUserSubId;
   final String? lastModified;
   final String? lastModifiedBy;
   final List<PostComment> replies;
@@ -342,6 +351,7 @@ class PostComment {
     this.isLikedByMe = false,
     this.created,
     this.createdBy,
+    this.creatorUserSubId,
     this.lastModified,
     this.lastModifiedBy,
     this.replies = const [],
@@ -368,6 +378,7 @@ class PostComment {
       isLikedByMe: json['islikedByMe'] ?? false,
       created: json['created'],
       createdBy: json['createdBy'],
+      creatorUserSubId: json['creatorUserSubId'],
       lastModified: json['lastModified'],
       lastModifiedBy: json['lastModifiedBy'],
       replies: repliesList,
@@ -387,6 +398,7 @@ class PostComment {
     bool? isLikedByMe,
     String? created,
     String? createdBy,
+    String? creatorUserSubId,
     String? lastModified,
     String? lastModifiedBy,
     List<PostComment>? replies,
@@ -396,13 +408,15 @@ class PostComment {
       postId: postId ?? this.postId,
       parentCommentId: parentCommentId ?? this.parentCommentId,
       creatorUserName: creatorUserName ?? this.creatorUserName,
-      creatorProfilePictureUrl: creatorProfilePictureUrl ?? this.creatorProfilePictureUrl,
+      creatorProfilePictureUrl:
+          creatorProfilePictureUrl ?? this.creatorProfilePictureUrl,
       content: content ?? this.content,
       likesCount: likesCount ?? this.likesCount,
       repliesCount: repliesCount ?? this.repliesCount,
       isLikedByMe: isLikedByMe ?? this.isLikedByMe,
       created: created ?? this.created,
       createdBy: createdBy ?? this.createdBy,
+      creatorUserSubId: creatorUserSubId ?? this.creatorUserSubId,
       lastModified: lastModified ?? this.lastModified,
       lastModifiedBy: lastModifiedBy ?? this.lastModifiedBy,
       replies: replies ?? this.replies,
@@ -410,7 +424,10 @@ class PostComment {
   }
 
   // Check if this is a reply (has parent comment)
-  bool get isReply => parentCommentId != null && parentCommentId!.isNotEmpty && parentCommentId != 'null';
+  bool get isReply =>
+      parentCommentId != null &&
+      parentCommentId!.isNotEmpty &&
+      parentCommentId != 'null';
 
   // Format date for display
   String get formattedDate {
@@ -430,8 +447,18 @@ class PostComment {
         return '${difference.inDays} يوم';
       } else {
         final months = [
-          'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-          'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+          'يناير',
+          'فبراير',
+          'مارس',
+          'أبريل',
+          'مايو',
+          'يونيو',
+          'يوليو',
+          'أغسطس',
+          'سبتمبر',
+          'أكتوبر',
+          'نوفمبر',
+          'ديسمبر',
         ];
         return '${date.day} ${months[date.month - 1]}';
       }
@@ -461,7 +488,10 @@ class PostComment {
 
   /// Build a comment tree from a flat list of comments
   /// Returns only root comments with their nested replies
-  static List<PostComment> buildCommentTree(List<PostComment> comments, {String? parentCommentId}) {
+  static List<PostComment> buildCommentTree(
+    List<PostComment> comments, {
+    String? parentCommentId,
+  }) {
     final List<PostComment> commentTree = [];
 
     for (final comment in comments) {
@@ -473,9 +503,10 @@ class PostComment {
       bool isMatch;
       if (parentCommentId == null) {
         // Looking for root comments (no parent)
-        isMatch = commentParentId == null ||
-                  commentParentId.isEmpty ||
-                  commentParentId == 'null';
+        isMatch =
+            commentParentId == null ||
+            commentParentId.isEmpty ||
+            commentParentId == 'null';
       } else {
         // Looking for replies to a specific parent
         isMatch = commentParentId == parentCommentId;
@@ -486,9 +517,7 @@ class PostComment {
         final replies = buildCommentTree(comments, parentCommentId: commentId);
 
         // Create comment with nested replies
-        final commentWithReplies = comment.copyWith(
-          replies: replies,
-        );
+        final commentWithReplies = comment.copyWith(replies: replies);
 
         commentTree.add(commentWithReplies);
       }
@@ -503,10 +532,7 @@ class PostDetail {
   final Post post;
   final List<PostComment> comments;
 
-  PostDetail({
-    required this.post,
-    required this.comments,
-  });
+  PostDetail({required this.post, required this.comments});
 
   factory PostDetail.fromJson(Map<String, dynamic> json) {
     // Parse post
@@ -520,10 +546,7 @@ class PostDetail {
       }
     }
 
-    return PostDetail(
-      post: post,
-      comments: commentsList,
-    );
+    return PostDetail(post: post, comments: commentsList);
   }
 
   // Get root comments (not replies)

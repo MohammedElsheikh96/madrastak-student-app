@@ -181,10 +181,7 @@ class _CommunicationTabState extends State<CommunicationTab> {
               SizedBox(height: 16),
               Text(
                 'جاري تحميل المساحة...',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF757575),
-                ),
+                style: TextStyle(fontSize: 14, color: Color(0xFF757575)),
               ),
             ],
           ),
@@ -208,10 +205,7 @@ class _CommunicationTabState extends State<CommunicationTab> {
               const SizedBox(height: 16),
               Text(
                 widget.spaceError!,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF757575),
-                ),
+                style: const TextStyle(fontSize: 14, color: Color(0xFF757575)),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
@@ -334,7 +328,7 @@ class _CommunicationTabState extends State<CommunicationTab> {
                   postId: post.id,
                   authorName: post.authorName,
                   authorImage: post.authorImage,
-                  authorUserId: post.user?.id,
+                  authorUserId: post.user?.subId,
                   currentUserId: _userId,
                   date: post.formattedDate,
                   title: post.title,

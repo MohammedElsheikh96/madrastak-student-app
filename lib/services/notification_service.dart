@@ -12,7 +12,7 @@ class NotificationService extends ChangeNotifier {
 
   // Temporary static token - same as in ApiClient
   static const String _staticToken =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjJiODVmZTk2LTU3ZjgtNDBiNi05NjAxLTMyYTA3Mjg4NmUxMSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvdXNlcmRhdGEiOiJjNTA2MTY3My01YjVmLTRlNWUtYWI3OC1kOWY1MWVlZjNkZDIiLCJuYW1lIjoi2LnYqNiv2KfZhNmH2KfYr9mJINmF2K3ZhdivINi52KjYr9in2YTZh9in2K_ZiSDYudmE2Ykg2KfZhNi02YrZiNmJIiwiZW1haWwiOiIxNDU0MUBzYWJyb2FkLm1vZS5lZHUuZWciLCJwaG9uZV9udW1iZXIiOiIiLCJwcm9maWxlX3BpY3R1cmVfdXJsIjoiIiwic3RhZ2VfbmFtZSI6Itin2YTYqti52YTZitmFINin2YTYp9i52K_Yp9iv2YogIiwiZ3JhZGVfbmFtZSI6Itin2YTYtdmBINin2YTYq9in2YbZiiDYp9mE2KfYudiv2KfYr9mKIiwiY291bnRyeV9uYW1lIjoi2KXZiti32KfZhNmK2KciLCJuYmYiOjE3NzA1NTU0OTMsImV4cCI6MTc3MDkwMTA5MywiaWF0IjoxNzcwNTU1NDkzfQ.y0Bofp8ubOD6-6cE0Pudi0TURooNIrvGe756Dm_mbjg';
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjJiODVmZTk2LTU3ZjgtNDBiNi05NjAxLTMyYTA3Mjg4NmUxMSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvdXNlcmRhdGEiOiJjNTA2MTY3My01YjVmLTRlNWUtYWI3OC1kOWY1MWVlZjNkZDIiLCJuYW1lIjoi2LnYqNiv2KfZhNmH2KfYr9mJINmF2K3ZhdivINi52KjYr9in2YTZh9in2K_ZiSDYudmE2Ykg2KfZhNi02YrZiNmJIiwiZW1haWwiOiIxNDU0MUBzYWJyb2FkLm1vZS5lZHUuZWciLCJwaG9uZV9udW1iZXIiOiIiLCJwcm9maWxlX3BpY3R1cmVfdXJsIjoiIiwic3RhZ2VfbmFtZSI6Itin2YTYqti52YTZitmFINin2YTYp9i52K_Yp9iv2YogIiwiZ3JhZGVfbmFtZSI6Itin2YTYtdmBINin2YTYq9in2YbZiiDYp9mE2KfYudiv2KfYr9mKIiwiY291bnRyeV9uYW1lIjoi2KXZiti32KfZhNmK2KciLCJuYmYiOjE3NzE0MTc1MzQsImV4cCI6MTc3MTc2MzEzNCwiaWF0IjoxNzcxNDE3NTM0fQ.uSD-vuthGPQJvxu5wMyyiJKwZKwtyedMXp27gVV2EoY';
 
   Map<String, String> _getHeaders() {
     return {
@@ -29,6 +29,7 @@ class NotificationService extends ChangeNotifier {
   bool _isLoading = false;
   bool _hasMore = true;
   static const int _pageSize = 20;
+  int? _currentFilter; // null = all, 1 = academic, 2 = social
 
   // Getters
   List<AppNotification> get notifications => _notifications;
@@ -47,6 +48,7 @@ class NotificationService extends ChangeNotifier {
     int page = 1,
     int pageSize = _pageSize,
     bool append = false,
+    int? notificationMessageType,
   }) async {
     if (_isLoading) return;
 
@@ -55,12 +57,13 @@ class NotificationService extends ChangeNotifier {
 
     try {
       final headers = _getHeaders();
-      final response = await http.get(
-        Uri.parse(
-          '${ApiConfig.tawasolApiUrl}/Notification/GetMyNotifications?pageNumber=$page&pageSize=$pageSize',
-        ),
-        headers: headers,
-      );
+      var url =
+          '${ApiConfig.tawasolApiUrl}/Notification/GetMyNotifications?pageNumber=$page&pageSize=$pageSize';
+      final filterType = notificationMessageType ?? _currentFilter;
+      if (filterType != null) {
+        url += '&type=$filterType';
+      }
+      final response = await http.get(Uri.parse(url), headers: headers);
 
       if (response.statusCode == 200) {
         final jsonData = jsonDecode(response.body);
@@ -97,6 +100,21 @@ class NotificationService extends ChangeNotifier {
     _currentPage = 1;
     _hasMore = true;
     await getMyNotifications(page: 1, append: false);
+  }
+
+  Future<void> refreshWithFilter(int? filter) async {
+    _currentFilter = filter;
+    _currentPage = 1;
+    _hasMore = true;
+    _notifications = [];
+    _groupedNotifications = [];
+    _isLoading = false; // Reset so getMyNotifications won't skip
+    notifyListeners();
+    await getMyNotifications(
+      page: 1,
+      append: false,
+      notificationMessageType: filter,
+    );
   }
 
   Future<void> loadMoreNotifications() async {
@@ -155,6 +173,61 @@ class NotificationService extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('Error marking all notifications as read: $e');
+    }
+    return false;
+  }
+
+  Future<bool> deleteNotification(String notificationId) async {
+    try {
+      final headers = _getHeaders();
+      final response = await http.delete(
+        Uri.parse(
+          '${ApiConfig.tawasolApiUrl}/Notification/DeleteNotification/$notificationId',
+        ),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final index = _notifications.indexWhere((n) => n.id == notificationId);
+        if (index != -1) {
+          if (!_notifications[index].isRead) {
+            _unreadCount = (_unreadCount - 1).clamp(0, _totalCount);
+            _unreadCountController.add(_unreadCount);
+          }
+          _notifications.removeAt(index);
+          _totalCount = (_totalCount - 1).clamp(0, _totalCount);
+          _groupNotifications();
+          notifyListeners();
+        }
+        return true;
+      }
+    } catch (e) {
+      debugPrint('Error deleting notification: $e');
+    }
+    return false;
+  }
+
+  Future<bool> clearAllNotifications() async {
+    try {
+      final headers = _getHeaders();
+      final response = await http.delete(
+        Uri.parse('${ApiConfig.tawasolApiUrl}/Notification/DeleteAllNotifications'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        _notifications.clear();
+        _groupedNotifications.clear();
+        _totalCount = 0;
+        _unreadCount = 0;
+        _currentPage = 1;
+        _hasMore = false;
+        _unreadCountController.add(_unreadCount);
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('Error clearing all notifications: $e');
     }
     return false;
   }

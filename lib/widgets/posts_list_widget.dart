@@ -8,8 +8,8 @@ import 'create_post_sheet.dart';
 /// A reusable widget that displays a list of posts for a given course/space.
 /// Can be used in both HomeTab and CommunicationTab.
 class PostsListWidget extends StatefulWidget {
-  /// The course to display posts for
-  final Course course;
+  /// The course to display posts for (nullable for profile page usage)
+  final Course? course;
 
   /// Optional pre-loaded spaceId (if null, will be fetched)
   final String? spaceId;
@@ -26,6 +26,9 @@ class PostsListWidget extends StatefulWidget {
   /// Whether to show the course header (cover image, name, etc.)
   final bool showCourseHeader;
 
+  /// Whether to show the create post area (without course header)
+  final bool showCreatePost;
+
   /// Current user name for post creation
   final String userName;
 
@@ -37,12 +40,13 @@ class PostsListWidget extends StatefulWidget {
 
   const PostsListWidget({
     super.key,
-    required this.course,
+    this.course,
     this.spaceId,
     this.isLoadingSpace = false,
     this.spaceError,
     this.onRetryLoadSpace,
     this.showCourseHeader = true,
+    this.showCreatePost = false,
     required this.userName,
     this.userImage,
     this.currentUserId,
@@ -200,10 +204,7 @@ class _PostsListWidgetState extends State<PostsListWidget> {
               SizedBox(height: 16),
               Text(
                 'جاري تحميل المساحة...',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF757575),
-                ),
+                style: TextStyle(fontSize: 14, color: Color(0xFF757575)),
               ),
             ],
           ),
@@ -227,10 +228,7 @@ class _PostsListWidgetState extends State<PostsListWidget> {
               const SizedBox(height: 16),
               Text(
                 widget.spaceError!,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF757575),
-                ),
+                style: const TextStyle(fontSize: 14, color: Color(0xFF757575)),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
@@ -259,13 +257,17 @@ class _PostsListWidgetState extends State<PostsListWidget> {
           padding: const EdgeInsets.only(bottom: 120),
           itemCount: _getItemCount(),
           itemBuilder: (context, index) {
-            // Course header (if enabled)
-            if (widget.showCourseHeader && index == 0) {
-              return _buildCourseHeader();
+            // Course header or create post area
+            if (_hasHeader && index == 0) {
+              if (widget.showCourseHeader) {
+                return _buildCourseHeader();
+              } else {
+                return _buildCreatePostArea();
+              }
             }
 
             // Adjust index if header is shown
-            final adjustedIndex = widget.showCourseHeader ? index - 1 : index;
+            final adjustedIndex = _hasHeader ? index - 1 : index;
 
             // Loading posts indicator (initial load)
             if (_isLoadingPosts && _posts.isEmpty) {
@@ -365,7 +367,7 @@ class _PostsListWidgetState extends State<PostsListWidget> {
                   postId: post.id,
                   authorName: post.authorName,
                   authorImage: post.authorImage,
-                  authorUserId: post.user?.id,
+                  authorUserId: post.user?.subId,
                   currentUserId: widget.currentUserId,
                   date: post.formattedDate,
                   title: post.title,
@@ -427,8 +429,10 @@ class _PostsListWidgetState extends State<PostsListWidget> {
     );
   }
 
+  bool get _hasHeader => widget.showCourseHeader || widget.showCreatePost;
+
   int _getItemCount() {
-    int count = widget.showCourseHeader ? 1 : 0; // Header
+    int count = _hasHeader ? 1 : 0; // Header or create post
     if (_isLoadingPosts && _posts.isEmpty) {
       count++; // Loading indicator
     } else if (_postsError != null && _posts.isEmpty) {
@@ -457,9 +461,9 @@ class _PostsListWidgetState extends State<PostsListWidget> {
               SizedBox(
                 height: 160,
                 width: double.infinity,
-                child: widget.course.coverImage != null
+                child: widget.course?.coverImage != null
                     ? Image.network(
-                        widget.course.coverImage!,
+                        widget.course!.coverImage!,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
                           return Container(
@@ -511,9 +515,9 @@ class _PostsListWidgetState extends State<PostsListWidget> {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(6),
-                        child: widget.course.image != null
+                        child: widget.course?.image != null
                             ? Image.network(
-                                widget.course.image!,
+                                widget.course!.image!,
                                 fit: BoxFit.cover,
                                 errorBuilder: (context, error, stackTrace) {
                                   return Container(
@@ -540,7 +544,7 @@ class _PostsListWidgetState extends State<PostsListWidget> {
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: Text(
-                        'مادة ${widget.course.displayName}',
+                        'مادة ${widget.course?.displayName ?? ''}',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -579,6 +583,29 @@ class _PostsListWidgetState extends State<PostsListWidget> {
     );
   }
 
+  Widget _buildCreatePostArea() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(16),
+      child: GestureDetector(
+        onTap: () => _showCreatePostPopup(),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF5F5F5),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Text(
+            'شارك افكارك هنا؟',
+            textAlign: TextAlign.right,
+            style: TextStyle(fontSize: 14, color: Color(0xFF9E9E9E)),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showCreatePostPopup() {
     showModalBottomSheet(
       context: context,
@@ -587,7 +614,7 @@ class _PostsListWidgetState extends State<PostsListWidget> {
       builder: (context) => CreatePostSheet(
         userName: widget.userName,
         userImage: widget.userImage,
-        courseId: widget.course.id.toString(),
+        courseId: widget.course?.id.toString() ?? '',
         spaceId: widget.spaceId,
         onPostResult: (success, message) {
           Navigator.pop(context);

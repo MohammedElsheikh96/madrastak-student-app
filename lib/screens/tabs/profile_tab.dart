@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../models/student_data.dart';
+import '../../models/profile_space.dart';
 import '../../services/auth_service.dart';
+import '../../services/space_service.dart';
 import '../../widgets/user_header.dart';
+import '../../widgets/posts_list_widget.dart';
+import '../../widgets/friends_list_widget.dart';
 import '../login_page.dart';
+import '../edit_profile_page.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
@@ -11,24 +17,76 @@ class ProfileTab extends StatefulWidget {
   State<ProfileTab> createState() => _ProfileTabState();
 }
 
-class _ProfileTabState extends State<ProfileTab> {
+class _ProfileTabState extends State<ProfileTab> with TickerProviderStateMixin {
   final AuthService _authService = AuthService();
+  final SpaceService _spaceService = SpaceService();
+
+  late TabController _tabController;
+
   StudentData? _studentData;
+  ProfileSpace? _profileSpace;
   bool _isLoading = true;
+  String? _error;
+
+  static const String _fallbackUserId = 'c5061673-5b5f-4e5e-ab78-d9f51eef3dd2';
 
   @override
   void initState() {
     super.initState();
-    _loadStudentData();
+    _tabController = TabController(length: 2, vsync: this);
+    _loadData();
   }
 
-  Future<void> _loadStudentData() async {
-    final data = await _authService.getStudentData();
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    // Load student data and profile space in parallel
+    final results = await Future.wait([
+      _authService.getStudentData(),
+      _spaceService.getUserProfileSpace(),
+    ]);
+
     if (mounted) {
+      final studentData = results[0] as StudentData?;
+      final profileResult = results[1] as ProfileSpaceResult;
+
       setState(() {
-        _studentData = data;
+        _studentData = studentData;
         _isLoading = false;
+        if (profileResult.success && profileResult.profileSpace != null) {
+          _profileSpace = profileResult.profileSpace;
+        } else {
+          _error = profileResult.message;
+        }
       });
+    }
+  }
+
+  Future<void> _navigateToEditProfile() async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) => EditProfilePage(
+          currentName:
+              _profileSpace?.name ?? _studentData?.userBasicInfo.name ?? '',
+          description: _profileSpace?.description,
+          currentProfileImage:
+              _profileSpace?.profileImageUrl ??
+              _studentData?.userBasicInfo.profilePicture,
+          currentCoverImage: _profileSpace?.coverImageUrl,
+        ),
+      ),
+    );
+    if (result == true && mounted) {
+      _loadData();
     }
   }
 
@@ -37,26 +95,29 @@ class _ProfileTabState extends State<ProfileTab> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.logout, color: Color(0xFF1976D2)),
-            SizedBox(width: 8),
+            const Icon(Icons.logout, color: Color(0xFF1976D2)),
+            const SizedBox(width: 8),
             Text(
               'تسجيل الخروج',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: GoogleFonts.alexandria(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
         ),
-        content: const Text(
+        content: Text(
           'هل أنت متأكد من رغبتك في تسجيل الخروج؟',
-          style: TextStyle(fontSize: 16),
+          style: GoogleFonts.alexandria(fontSize: 16),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text(
+            child: Text(
               'إلغاء',
-              style: TextStyle(color: Color(0xFF757575)),
+              style: GoogleFonts.alexandria(color: const Color(0xFF757575)),
             ),
           ),
           ElevatedButton(
@@ -67,9 +128,9 @@ class _ProfileTabState extends State<ProfileTab> {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            child: const Text(
+            child: Text(
               'تسجيل الخروج',
-              style: TextStyle(color: Colors.white),
+              style: GoogleFonts.alexandria(color: Colors.white),
             ),
           ),
         ],
@@ -107,241 +168,257 @@ class _ProfileTabState extends State<ProfileTab> {
       backgroundColor: const Color(0xFFF5F5F5),
       body: Column(
         children: [
-          _buildHeader(),
-          Expanded(
-            child: _isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFF1976D2)),
-                  )
-                : _studentData != null
-                ? const Center(
-                    child: Text(
-                      'لا توجد بيانات',
-                      style: TextStyle(fontSize: 16, color: Color(0xFF757575)),
-                    ),
-                  )
-                : SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-                    child: Column(
-                      children: [
-                        _buildProfileHeader(),
-                        const SizedBox(height: 24),
-                        _buildInfoCard(),
-                        const SizedBox(height: 24),
-                        _buildLogoutButton(),
-                      ],
-                    ),
-                  ),
+          UserHeader(
+            userName:
+                _profileSpace?.name ??
+                _studentData?.userBasicInfo.name ??
+                'مستخدم',
+            userImage:
+                _profileSpace?.profileImageUrl ??
+                _studentData?.userBasicInfo.profilePicture,
+            hideUserInfo: true,
+            showLogout: true,
+            onLogout: _showLogoutConfirmation,
           ),
+          if (_isLoading)
+            const Expanded(
+              child: Center(
+                child: CircularProgressIndicator(color: Color(0xFF0F6EB7)),
+              ),
+            )
+          else if (_error != null && _profileSpace == null)
+            Expanded(child: _buildErrorState())
+          else ...[
+            _buildProfileHeader(),
+            _buildTabBar(),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  // Activity tab - reuse PostsListWidget
+                  PostsListWidget(
+                    spaceId: _profileSpace?.id,
+                    isLoadingSpace: _isLoading,
+                    spaceError: _error,
+                    onRetryLoadSpace: _loadData,
+                    showCourseHeader: false,
+                    showCreatePost: true,
+                    userName: _studentData?.userBasicInfo.name ?? 'مستخدم',
+                    userImage: _studentData?.userBasicInfo.profilePicture,
+                    currentUserId: _studentData?.id ?? _fallbackUserId,
+                  ),
+                  // Friends tab
+                  FriendsListWidget(spaceId: _profileSpace?.id),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return UserHeader(
-      userName: _studentData?.userBasicInfo.name ?? 'مستخدم',
-      userImage: _studentData?.userBasicInfo.profilePicture,
     );
   }
 
   Widget _buildProfileHeader() {
-    final profileImage = _studentData?.userBasicInfo.profilePicture;
-    final userName = _studentData?.userBasicInfo.name ?? 'مستخدم';
+    final profileImage =
+        _profileSpace?.profileImageUrl ??
+        _studentData?.userBasicInfo.profilePicture;
+    final userName =
+        _profileSpace?.name ?? _studentData?.userBasicInfo.name ?? 'مستخدم';
+    final bio = _profileSpace?.description ?? '';
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
+    return SizedBox(
+      height: 240,
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
+          // Cover image
           Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFF1976D2), width: 3),
-            ),
-            child: ClipOval(
-              child: profileImage != null && profileImage.isNotEmpty
-                  ? Image.network(
-                      profileImage,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return _buildDefaultAvatar();
-                      },
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return Center(
-                          child: CircularProgressIndicator(
-                            value: loadingProgress.expectedTotalBytes != null
-                                ? loadingProgress.cumulativeBytesLoaded /
-                                      loadingProgress.expectedTotalBytes!
-                                : null,
-                            color: const Color(0xFF1976D2),
-                            strokeWidth: 2,
-                          ),
-                        );
-                      },
-                    )
-                  : _buildDefaultAvatar(),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            userName,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF333333),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDefaultAvatar() {
-    return Container(
-      color: const Color(0xFFE3F2FD),
-      child: const Icon(Icons.person, size: 50, color: Color(0xFF1976D2)),
-    );
-  }
-
-  Widget _buildInfoCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'المعلومات الشخصية',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF333333),
-            ),
-          ),
-          const SizedBox(height: 16),
-          _buildInfoRow(
-            icon: Icons.email_outlined,
-            label: 'البريد الإلكتروني',
-            value: _studentData?.userBasicInfo.email ?? 'غير متوفر',
-          ),
-          const Divider(height: 24),
-          _buildInfoRow(
-            icon: Icons.phone_outlined,
-            label: 'رقم الهاتف',
-            value: _studentData?.userBasicInfo.phone ?? 'غير متوفر',
-          ),
-          const Divider(height: 24),
-          _buildInfoRow(
-            icon: Icons.school_outlined,
-            label: 'السنة الدراسية',
-            value: _getStudyYear(),
-          ),
-          const Divider(height: 24),
-          _buildInfoRow(
-            icon: Icons.location_on_outlined,
-            label: 'الدولة',
-            value: _studentData?.countryName ?? 'غير متوفر',
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _getStudyYear() {
-    final subInterests = _studentData?.accountPreference?.subInterests;
-    if (subInterests != null && subInterests.isNotEmpty) {
-      return subInterests[0].arabicName ?? 'غير متوفر';
-    }
-    return 'غير متوفر';
-  }
-
-  Widget _buildInfoRow({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: const Color(0xFFE3F2FD),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, color: const Color(0xFF1976D2), size: 22),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(fontSize: 13, color: Color(0xFF757575)),
+            height: 150,
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF1A237E), Color(0xFF0F6EB7)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              const SizedBox(height: 4),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w400,
-                  color: Color(0xFF333333),
+            ),
+            child:
+                (_profileSpace?.coverImageUrl != null &&
+                    _profileSpace!.coverImageUrl!.isNotEmpty)
+                ? Image.network(
+                    _profileSpace!.coverImageUrl!,
+                    width: double.infinity,
+                    height: 150,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const SizedBox.shrink(),
+                  )
+                : null,
+          ),
+          // Edit profile icon on cover
+          Positioned(
+            top: 12,
+            left: 12,
+            child: GestureDetector(
+              onTap: _navigateToEditProfile,
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.edit_outlined,
+                  color: Colors.white.withValues(alpha: 0.9),
+                  size: 20,
                 ),
               ),
-            ],
+            ),
           ),
-        ),
-      ],
+          // Profile image + name centered
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Column(
+              children: [
+                // Profile avatar
+                Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 4),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.15),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: ClipOval(
+                    child: profileImage != null && profileImage.isNotEmpty
+                        ? Image.network(
+                            profileImage,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: const Color(0xFFE3F2FD),
+                                child: const Icon(
+                                  Icons.person,
+                                  size: 50,
+                                  color: Color(0xFF1976D2),
+                                ),
+                              );
+                            },
+                          )
+                        : Container(
+                            color: const Color(0xFFE3F2FD),
+                            child: const Icon(
+                              Icons.person,
+                              size: 50,
+                              color: Color(0xFF1976D2),
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // User name
+                Text(
+                  userName,
+                  style: GoogleFonts.alexandria(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF333333),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                // Bio
+                Text(
+                  bio,
+                  style: GoogleFonts.alexandria(
+                    fontSize: 13,
+                    color: const Color(0xFF333333),
+                  ),
+                  textAlign: TextAlign.start,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildLogoutButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 52,
-      child: ElevatedButton.icon(
-        onPressed: _showLogoutConfirmation,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red.shade50,
-          foregroundColor: Colors.red,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: Colors.red.shade200),
+  Widget _buildTabBar() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEEEEE),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: TabBar(
+        controller: _tabController,
+        labelColor: Colors.white,
+        unselectedLabelColor: const Color(0xFF757575),
+        indicator: BoxDecoration(
+          color: const Color(0xFF0F6EB7),
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F6EB7).withValues(alpha: 0.3),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerColor: Colors.transparent,
+        labelStyle: GoogleFonts.alexandria(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+        unselectedLabelStyle: GoogleFonts.alexandria(
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+        ),
+        tabs: const [
+          Tab(text: 'النشاط'),
+          Tab(text: 'الزملاء'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline, size: 48, color: Color(0xFF757575)),
+          const SizedBox(height: 16),
+          Text(
+            _error ?? 'حدث خطأ',
+            style: GoogleFonts.alexandria(
+              fontSize: 14,
+              color: const Color(0xFF757575),
+            ),
+            textAlign: TextAlign.center,
           ),
-        ),
-        icon: Transform.rotate(
-          angle: 3.14159, // 180 degrees in radians
-          child: const Icon(Icons.logout),
-        ),
-        label: const Text(
-          'تسجيل الخروج',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _loadData,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0F6EB7),
+              foregroundColor: Colors.white,
+            ),
+            child: Text('إعادة المحاولة', style: GoogleFonts.alexandria()),
+          ),
+        ],
       ),
     );
   }

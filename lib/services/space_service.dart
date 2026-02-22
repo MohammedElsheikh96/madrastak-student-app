@@ -4,6 +4,8 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:mime/mime.dart';
 import '../models/post.dart';
+import '../models/profile_space.dart';
+import '../models/friend.dart';
 
 class SpaceService {
   static const String _baseUrl =
@@ -11,7 +13,7 @@ class SpaceService {
 
   // Static token for testing - same as ApiClient
   static const String _staticToken =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjJiODVmZTk2LTU3ZjgtNDBiNi05NjAxLTMyYTA3Mjg4NmUxMSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvdXNlcmRhdGEiOiJjNTA2MTY3My01YjVmLTRlNWUtYWI3OC1kOWY1MWVlZjNkZDIiLCJuYW1lIjoi2LnYqNiv2KfZhNmH2KfYr9mJINmF2K3ZhdivINi52KjYr9in2YTZh9in2K_ZiSDYudmE2Ykg2KfZhNi02YrZiNmJIiwiZW1haWwiOiIxNDU0MUBzYWJyb2FkLm1vZS5lZHUuZWciLCJwaG9uZV9udW1iZXIiOiIiLCJwcm9maWxlX3BpY3R1cmVfdXJsIjoiIiwic3RhZ2VfbmFtZSI6Itin2YTYqti52YTZitmFINin2YTYp9i52K_Yp9iv2YogIiwiZ3JhZGVfbmFtZSI6Itin2YTYtdmBINin2YTYq9in2YbZiiDYp9mE2KfYudiv2KfYr9mKIiwiY291bnRyeV9uYW1lIjoi2KXZiti32KfZhNmK2KciLCJuYmYiOjE3NzA1NTU0OTMsImV4cCI6MTc3MDkwMTA5MywiaWF0IjoxNzcwNTU1NDkzfQ.y0Bofp8ubOD6-6cE0Pudi0TURooNIrvGe756Dm_mbjg';
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjJiODVmZTk2LTU3ZjgtNDBiNi05NjAxLTMyYTA3Mjg4NmUxMSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvdXNlcmRhdGEiOiJjNTA2MTY3My01YjVmLTRlNWUtYWI3OC1kOWY1MWVlZjNkZDIiLCJuYW1lIjoi2LnYqNiv2KfZhNmH2KfYr9mJINmF2K3ZhdivINi52KjYr9in2YTZh9in2K_ZiSDYudmE2Ykg2KfZhNi02YrZiNmJIiwiZW1haWwiOiIxNDU0MUBzYWJyb2FkLm1vZS5lZHUuZWciLCJwaG9uZV9udW1iZXIiOiIiLCJwcm9maWxlX3BpY3R1cmVfdXJsIjoiIiwic3RhZ2VfbmFtZSI6Itin2YTYqti52YTZitmFINin2YTYp9i52K_Yp9iv2YogIiwiZ3JhZGVfbmFtZSI6Itin2YTYtdmBINin2YTYq9in2YbZiiDYp9mE2KfYudiv2KfYr9mKIiwiY291bnRyeV9uYW1lIjoi2KXZiti32KfZhNmK2KciLCJuYmYiOjE3NzE0MTc1MzQsImV4cCI6MTc3MTc2MzEzNCwiaWF0IjoxNzcxNDE3NTM0fQ.uSD-vuthGPQJvxu5wMyyiJKwZKwtyedMXp27gVV2EoY';
 
   Future<String?> _getToken() async {
     return _staticToken;
@@ -657,6 +659,280 @@ class SpaceService {
       );
     }
   }
+
+  /// Get the user's profile space
+  Future<ProfileSpaceResult> getUserProfileSpace() async {
+    try {
+      final token = await _getToken();
+      if (token == null) {
+        return ProfileSpaceResult(
+          success: false,
+          message: 'غير مصرح - يرجى تسجيل الدخول',
+        );
+      }
+
+      final uri = Uri.parse('$_baseUrl/Space/GetUserProfileSpace');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data != null && data['data'] != null) {
+          final profileSpace = ProfileSpace.fromJson(data['data']);
+          return ProfileSpaceResult(
+            success: true,
+            message: 'تم تحميل الملف الشخصي بنجاح',
+            profileSpace: profileSpace,
+          );
+        } else {
+          return ProfileSpaceResult(
+            success: false,
+            message: 'لم يتم العثور على الملف الشخصي',
+          );
+        }
+      } else if (response.statusCode == 401) {
+        return ProfileSpaceResult(
+          success: false,
+          message: 'غير مصرح - يرجى تسجيل الدخول مرة أخرى',
+        );
+      } else {
+        return ProfileSpaceResult(
+          success: false,
+          message: 'حدث خطأ: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      return ProfileSpaceResult(
+        success: false,
+        message: 'حدث خطأ في الاتصال: $e',
+      );
+    }
+  }
+
+  /// Get friends list for a space with pagination
+  Future<FriendsResult> getFriendsList({
+    required String spaceId,
+    required int pageNumber,
+    required int pageSize,
+  }) async {
+    try {
+      final token = await _getToken();
+      if (token == null) {
+        return FriendsResult(
+          success: false,
+          message: 'غير مصرح - يرجى تسجيل الدخول',
+        );
+      }
+
+      final uri = Uri.parse(
+        '$_baseUrl/Space/GetFriendsList?SpaceId=$spaceId&PageNumber=$pageNumber&PageSize=$pageSize',
+      );
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data != null && data['data'] != null) {
+          final pagedResponse = FriendsPagedResponse.fromJson(data['data']);
+          return FriendsResult(
+            success: true,
+            message: 'تم تحميل الأصدقاء بنجاح',
+            friends: pagedResponse.friends,
+            totalCount: pagedResponse.totalCount,
+          );
+        } else {
+          return FriendsResult(
+            success: true,
+            message: 'لا يوجد أصدقاء',
+            friends: [],
+            totalCount: 0,
+          );
+        }
+      } else if (response.statusCode == 401) {
+        return FriendsResult(
+          success: false,
+          message: 'غير مصرح - يرجى تسجيل الدخول مرة أخرى',
+        );
+      } else {
+        return FriendsResult(
+          success: false,
+          message: 'حدث خطأ: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      return FriendsResult(success: false, message: 'حدث خطأ في الاتصال: $e');
+    }
+  }
+
+  /// Get a space by its ID (for viewing other user profiles)
+  Future<ProfileSpaceResult> getSpaceById(String spaceId) async {
+    try {
+      final token = await _getToken();
+      if (token == null) {
+        return ProfileSpaceResult(
+          success: false,
+          message: 'غير مصرح - يرجى تسجيل الدخول',
+        );
+      }
+
+      final uri = Uri.parse('$_baseUrl/Space/GetSpaceById?spaceId=$spaceId');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data != null && data['data'] != null) {
+          final profileSpace = ProfileSpace.fromJson(data['data']);
+          return ProfileSpaceResult(
+            success: true,
+            message: 'تم تحميل الملف الشخصي بنجاح',
+            profileSpace: profileSpace,
+          );
+        } else if (data != null && data['id'] != null) {
+          final profileSpace = ProfileSpace.fromJson(data);
+          return ProfileSpaceResult(
+            success: true,
+            message: 'تم تحميل الملف الشخصي بنجاح',
+            profileSpace: profileSpace,
+          );
+        } else {
+          return ProfileSpaceResult(
+            success: false,
+            message: 'لم يتم العثور على الملف الشخصي',
+          );
+        }
+      } else if (response.statusCode == 401) {
+        return ProfileSpaceResult(
+          success: false,
+          message: 'غير مصرح - يرجى تسجيل الدخول مرة أخرى',
+        );
+      } else {
+        return ProfileSpaceResult(
+          success: false,
+          message: 'حدث خطأ: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      return ProfileSpaceResult(
+        success: false,
+        message: 'حدث خطأ في الاتصال: $e',
+      );
+    }
+  }
+
+  /// Add a friend by userId
+  Future<FriendActionResult> addFriend(String userId) async {
+    try {
+      final token = await _getToken();
+      if (token == null) {
+        return FriendActionResult(
+          success: false,
+          message: 'غير مصرح - يرجى تسجيل الدخول',
+        );
+      }
+
+      final uri = Uri.parse('$_baseUrl/Space/AddFriend?userId=$userId');
+
+      final response = await http.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return FriendActionResult(
+          success: true,
+          message: 'تمت إضافة الزميل بنجاح',
+        );
+      } else if (response.statusCode == 401) {
+        return FriendActionResult(
+          success: false,
+          message: 'غير مصرح - يرجى تسجيل الدخول مرة أخرى',
+        );
+      } else {
+        return FriendActionResult(
+          success: false,
+          message: 'حدث خطأ: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      return FriendActionResult(
+        success: false,
+        message: 'حدث خطأ في الاتصال: $e',
+      );
+    }
+  }
+
+  /// Remove a friend by userId
+  Future<FriendActionResult> removeFriend(String userId) async {
+    try {
+      final token = await _getToken();
+      if (token == null) {
+        return FriendActionResult(
+          success: false,
+          message: 'غير مصرح - يرجى تسجيل الدخول',
+        );
+      }
+
+      final uri = Uri.parse('$_baseUrl/Space/RemoveFriend?userId=$userId');
+
+      print('RemoveFriend URL: $uri');
+
+      final response = await http.delete(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      print('RemoveFriend status: ${response.statusCode}');
+      print('RemoveFriend body: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        return FriendActionResult(
+          success: true,
+          message: 'تم إلغاء الصداقة بنجاح',
+        );
+      } else if (response.statusCode == 401) {
+        return FriendActionResult(
+          success: false,
+          message: 'غير مصرح - يرجى تسجيل الدخول مرة أخرى',
+        );
+      } else {
+        return FriendActionResult(
+          success: false,
+          message: 'حدث خطأ: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      return FriendActionResult(
+        success: false,
+        message: 'حدث خطأ في الاتصال: $e',
+      );
+    }
+  }
 }
 
 class CreatePostResult {
@@ -741,4 +1017,37 @@ class Space {
       externalCourseId: json['externalCourseId'],
     );
   }
+}
+
+class ProfileSpaceResult {
+  final bool success;
+  final String message;
+  final ProfileSpace? profileSpace;
+
+  ProfileSpaceResult({
+    required this.success,
+    required this.message,
+    this.profileSpace,
+  });
+}
+
+class FriendsResult {
+  final bool success;
+  final String message;
+  final List<Friend>? friends;
+  final int totalCount;
+
+  FriendsResult({
+    required this.success,
+    required this.message,
+    this.friends,
+    this.totalCount = 0,
+  });
+}
+
+class FriendActionResult {
+  final bool success;
+  final String message;
+
+  FriendActionResult({required this.success, required this.message});
 }

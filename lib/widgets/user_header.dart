@@ -7,12 +7,18 @@ class UserHeader extends StatefulWidget {
   final String userName;
   final String? userImage;
   final VoidCallback? onNotificationTap;
+  final bool hideUserInfo;
+  final bool showLogout;
+  final VoidCallback? onLogout;
 
   const UserHeader({
     super.key,
     required this.userName,
     this.userImage,
     this.onNotificationTap,
+    this.hideUserInfo = false,
+    this.showLogout = false,
+    this.onLogout,
   });
 
   @override
@@ -59,37 +65,54 @@ class _UserHeaderState extends State<UserHeader> {
       ),
       child: Row(
         children: [
-          // Profile image on the right
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
+          if (!widget.hideUserInfo) ...[
+            // Profile image on the right
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
+              ),
+              child: ClipOval(
+                child: widget.userImage != null && widget.userImage!.isNotEmpty
+                    ? Image.network(
+                        widget.userImage!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return _buildDefaultAvatar();
+                        },
+                      )
+                    : _buildDefaultAvatar(),
+              ),
             ),
-            child: ClipOval(
-              child: widget.userImage != null && widget.userImage!.isNotEmpty
-                  ? Image.network(
-                      widget.userImage!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return _buildDefaultAvatar();
-                      },
-                    )
-                  : _buildDefaultAvatar(),
+            const SizedBox(width: 12),
+            // User name
+            Text(
+              widget.userName,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF333333),
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          // User name
-          Text(
-            widget.userName,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF333333),
-            ),
-          ),
+          ],
           const Spacer(),
+          // Logout button (only on profile tab)
+          if (widget.showLogout && widget.onLogout != null) ...[
+            IconButton(
+              onPressed: widget.onLogout,
+              icon: const Icon(
+                Icons.logout,
+                color: Colors.red,
+                size: 22,
+              ),
+              tooltip: 'تسجيل الخروج',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            ),
+            const SizedBox(width: 4),
+          ],
           // Notification bell icon with badge
           NotificationBellIcon(
             onTap: widget.onNotificationTap ?? _openNotificationsPage,
