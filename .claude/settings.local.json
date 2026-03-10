@@ -15,7 +15,17 @@
       "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd Flutter app with FCM notifications and social features\n\n- Implement complete notification system with Firebase Cloud Messaging\n- Add NotificationsPage with infinite scroll pagination \\(20 items per page\\)\n- Integrate Tawasol API for notifications \\(GetMyNotifications, MarkAsRead\\)\n- Add NotificationBellIcon with unread count badge\n- Configure Firebase for Android with google-services.json\n- Add bottom safe area padding to all tabs \\(home, profile, study materials\\)\n- Use GoogleFonts.alexandria consistently across notification UI\n- Include home page with custom curved bottom navigation bar\n- Add study materials tab with course grid view\n- Add profile tab with user information display\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git push:*)",
       "Bash(git restore:*)",
-      "Bash(flutter pub run:*)"
+      "Bash(flutter pub run:*)",
+      "Bash(cmd //c \"find /c /v \"\"\"\" d:\\\\flutter-pro\\\\madrastak_fe_masr\\\\lib\\\\services\\\\courses_service.dart\")",
+      "Bash(cmd //c \"flutter analyze lib/models/home_sections.dart lib/services/courses_service.dart lib/widgets/home_sections.dart lib/widgets/posts_list_widget.dart lib/screens/tabs/home_tab.dart\")",
+      "Bash(cmd.exe /c \"cd /d d:\\\\flutter-pro\\\\madrastak_fe_masr && flutter analyze lib\\\\screens\\\\course_tabs\\\\assessments_tab.dart\")",
+      "Bash(/c/flutter/bin/flutter analyze lib/services/grading_service.dart lib/models/grade_book_result.dart)",
+      "Bash(flutter.bat analyze lib/services/grading_service.dart)",
+      "Bash(flutter.bat analyze lib/models/grade_book_result.dart)",
+      "Bash(flutter.bat analyze lib/screens/course_tabs/assessments_tab.dart)",
+      "Bash(flutter.bat analyze lib/widgets/home_sections.dart)",
+      "Bash(flutter.bat analyze lib/screens/tabs/home_tab.dart)",
+      "Bash(flutter.bat analyze lib/screens/tabs/home_tab.dart lib/widgets/posts_list_widget.dart)"
     ]
   }
 }

@@ -1,7 +1,9 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:http/io_client.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/course.dart';
-import '../../models/grade_book_result.dart';
-import '../../services/grading_service.dart';
 
 class AssessmentsTab extends StatefulWidget {
   final Course course;
@@ -12,83 +14,85 @@ class AssessmentsTab extends StatefulWidget {
   State<AssessmentsTab> createState() => _AssessmentsTabState();
 }
 
-class _AssessmentsTabState extends State<AssessmentsTab>
-    with TickerProviderStateMixin {
-  final GradingService _gradingService = GradingService();
-  final Map<int, bool> _expandedCategories = {};
+class _AssessmentsTabState extends State<AssessmentsTab> {
+  static const String _baseUrl = 'https://mfm-student.madrasetna.net/api';
+  static const String _studentId = 'c5061673-5b5f-4e5e-ab78-d9f51eef3dd2';
+  static const String _token =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjJiODVmZTk2LTU3ZjgtNDBiNi05NjAxLTMyYTA3Mjg4NmUxMSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvdXNlcmRhdGEiOiJjNTA2MTY3My01YjVmLTRlNWUtYWI3OC1kOWY1MWVlZjNkZDIiLCJuYW1lIjoi2LnYqNiv2KfZhNmH2KfYr9mJINmF2K3ZhdivINi52KjYr9in2YTZh9in2K_ZiSDYudmE2Ykg2KfZhNi02YrZiNmJIiwiZW1haWwiOiIxNDU0MUBzYWJyb2FkLm1vZS5lZHUuZWciLCJwaG9uZV9udW1iZXIiOiIiLCJwcm9maWxlX3BpY3R1cmVfdXJsIjoiIiwic3RhZ2VfbmFtZSI6Itin2YTYqti52YTZitmFINin2YTYp9i52K_Yp9iv2YogIiwiZ3JhZGVfbmFtZSI6Itin2YTYtdmBINin2YTYq9in2YbZiiDYp9mE2KfYudiv2KfYr9mKIiwiY291bnRyeV9uYW1lIjoi2KXZiti32KfZhNmK2KciLCJuYmYiOjE3NzIzNzE0NjksImV4cCI6MTc3MjcxNzA2OSwiaWF0IjoxNzcyMzcxNDY5fQ.1MdmPe2r0kAiYluc9l1aZ1SIXjbHbUoruji4q89nqzM';
 
-  GradeBookResult? _gradeBookResult;
+  List<Map<String, dynamic>> _categories = [];
+  double _totalPercentage = 0.0;
   bool _isLoading = true;
   String? _error;
-
-  // Animation controllers
-  late AnimationController _pulseController;
-  late AnimationController _dotsController;
-  late Animation<double> _pulseAnimation;
-  late Animation<double> _scaleAnimation;
+  final Map<int, bool> _expandedCategories = {};
 
   @override
   void initState() {
     super.initState();
-    _initAnimations();
-    _loadGradeBook();
+    _fetchGradeBook();
   }
 
-  void _initAnimations() {
-    // Pulse animation for circle background
-    _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    )..repeat(reverse: true);
-
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
-
-    // Scale animation for "قريبا" text
-    _scaleAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
-
-    // Dots animation controller
-    _dotsController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    _dotsController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadGradeBook() async {
+  Future<void> _fetchGradeBook() async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
 
+    final httpClient = HttpClient()..badCertificateCallback = (_, _, _) => true;
+    final client = IOClient(httpClient);
+
     try {
-      final result = await _gradingService.getGradeBookResult(
-        widget.course.id.toString(),
+      final response = await client.post(
+        Uri.parse('$_baseUrl/Grading/getGradeBookResult'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_token',
+        },
+        body: jsonEncode([
+          {'studentId': _studentId, 'courseId': widget.course.id},
+        ]),
       );
-      setState(() {
-        _gradeBookResult = result;
-        _isLoading = false;
-        // Initialize all categories as expanded
-        if (result != null) {
-          for (int i = 0; i < result.categoryResults.length; i++) {
-            _expandedCategories[i] = true;
+
+      debugPrint('=== GRADING RESPONSE ===');
+      debugPrint('Status: ${response.statusCode}');
+      debugPrint('Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+        if (data['status'] == true && data['returnObject'] != null) {
+          final returnObject = data['returnObject'] as List;
+          if (returnObject.isNotEmpty) {
+            final result = returnObject[0]['result'] as Map<String, dynamic>?;
+            if (result != null) {
+              setState(() {
+                _categories = (result['categoryResults'] as List)
+                    .cast<Map<String, dynamic>>();
+                _totalPercentage =
+                    (result['totalPercentage'] as num?)?.toDouble() ?? 0.0;
+                _isLoading = false;
+                for (int i = 0; i < _categories.length; i++) {
+                  _expandedCategories[i] = true;
+                }
+              });
+              return;
+            }
           }
         }
+      }
+
+      setState(() {
+        _categories = [];
+        _isLoading = false;
       });
     } catch (e) {
+      debugPrint('Grading error: $e');
       setState(() {
         _error = 'حدث خطأ في تحميل التقييمات';
         _isLoading = false;
       });
+    } finally {
+      client.close();
     }
   }
 
@@ -109,13 +113,15 @@ class _AssessmentsTabState extends State<AssessmentsTab>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            const Icon(Icons.error_outline, size: 48, color: Color(0xFF757575)),
+            const SizedBox(height: 16),
             Text(
               _error!,
               style: const TextStyle(fontSize: 16, color: Color(0xFF757575)),
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _loadGradeBook,
+              onPressed: _fetchGradeBook,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0F6EB7),
               ),
@@ -129,260 +135,355 @@ class _AssessmentsTabState extends State<AssessmentsTab>
       );
     }
 
-    if (_gradeBookResult == null || _gradeBookResult!.categoryResults.isEmpty) {
-      return _buildEmptyState();
-    }
-
-    return RefreshIndicator(
-      onRefresh: _loadGradeBook,
-      color: const Color(0xFF0F6EB7),
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _gradeBookResult!.categoryResults.length,
-        itemBuilder: (context, index) {
-          return _buildCategorySection(
-            _gradeBookResult!.categoryResults[index],
-            index,
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
+    if (_categories.isEmpty) {
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // "قريبا" text with decorative styling and animation
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                // Light circle background with pulse animation
-                AnimatedBuilder(
-                  animation: _pulseAnimation,
-                  builder: (context, child) {
-                    return Transform.scale(
-                      scale: _pulseAnimation.value,
-                      child: Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF0F0F0),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                // "قريبا" text with scale animation
-                AnimatedBuilder(
-                  animation: _scaleAnimation,
-                  builder: (context, child) {
-                    return Transform.scale(
-                      scale: _scaleAnimation.value,
-                      child: const Text(
-                        'قريبا',
-                        style: TextStyle(
-                          fontSize: 48,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFFE74C3C),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ],
+            const Icon(
+              Icons.assignment_outlined,
+              size: 64,
+              color: Color(0xFFBDBDBD),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 16),
             const Text(
-              'التقييمات قادمة قريبا',
+              'لا توجد تقييمات حاليا',
               style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0F6EB7),
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'نعمل على تجهيز نظام التقييمات\nالخاص بك، ترقب التحديثات!',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
                 color: Color(0xFF757575),
-                height: 1.5,
               ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'سيتم عرض التقييمات عند توفرها',
+              style: TextStyle(fontSize: 14, color: Color(0xFF9E9E9E)),
             ),
             const SizedBox(height: 24),
-            // Animated dots indicator
-            _buildAnimatedDots(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAnimatedDots() {
-    return AnimatedBuilder(
-      animation: _dotsController,
-      builder: (context, child) {
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _buildAnimatedDot(0),
-            const SizedBox(width: 8),
-            _buildAnimatedDot(1),
-            const SizedBox(width: 8),
-            _buildAnimatedDot(2),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildAnimatedDot(int index) {
-    // Calculate which dot should be active based on animation progress
-    final progress = _dotsController.value;
-    final activeDotIndex = (progress * 3).floor() % 3;
-    final isActive = index == activeDotIndex;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      width: isActive ? 12 : 8,
-      height: isActive ? 12 : 8,
-      decoration: BoxDecoration(
-        color: isActive ? const Color(0xFF0F6EB7) : const Color(0xFFD0D0D0),
-        shape: BoxShape.circle,
-      ),
-    );
-  }
-
-  Widget _buildCategorySection(CategoryResult category, int categoryIndex) {
-    final isExpanded = _expandedCategories[categoryIndex] ?? true;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Category header with collapse arrow
-        GestureDetector(
-          onTap: () {
-            setState(() {
-              _expandedCategories[categoryIndex] = !isExpanded;
-            });
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Row(
-              children: [
-                // Arrow icon on the left
-                AnimatedRotation(
-                  turns: isExpanded ? 0.25 : 0,
-                  duration: const Duration(milliseconds: 200),
-                  child: const Icon(
-                    Icons.chevron_left,
-                    color: Color(0xFF0F6EB7),
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // Category title
-                Expanded(
-                  child: Text(
-                    category.categoryName,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F6EB7),
-                    ),
-                  ),
-                ),
-              ],
+            TextButton.icon(
+              onPressed: _fetchGradeBook,
+              icon: const Icon(Icons.refresh, color: Color(0xFF0F6EB7)),
+              label: const Text(
+                'تحديث',
+                style: TextStyle(color: Color(0xFF0F6EB7)),
+              ),
             ),
-          ),
+          ],
         ),
-        // Assignment items (collapsible)
-        AnimatedCrossFade(
-          firstChild: Column(
-            children: category.assignments
-                .map((assignment) => _buildAssignmentCard(assignment))
-                .toList(),
-          ),
-          secondChild: const SizedBox.shrink(),
-          crossFadeState: isExpanded
-              ? CrossFadeState.showFirst
-              : CrossFadeState.showSecond,
-          duration: const Duration(milliseconds: 200),
-        ),
-        const SizedBox(height: 8),
-      ],
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _fetchGradeBook,
+      color: const Color(0xFF0F6EB7),
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // Total percentage card
+          _buildTotalCard(),
+          const SizedBox(height: 16),
+          // Category sections
+          for (int i = 0; i < _categories.length; i++) ...[
+            _buildCategorySection(_categories[i], i),
+            if (i < _categories.length - 1) const SizedBox(height: 12),
+          ],
+        ],
+      ),
     );
   }
 
-  Widget _buildAssignmentCard(Assignment assignment) {
+  Widget _buildTotalCard() {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF0F6EB7), width: 1),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F6EB7), Color(0xFF1E88E5)],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         children: [
-          // Content on the right
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  assignment.assignmentName,
-                  style: const TextStyle(
-                    fontSize: 14,
+                const Text(
+                  'المجموع الكلي',
+                  style: TextStyle(
+                    fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF333333),
+                    color: Colors.white70,
                   ),
                 ),
-                const SizedBox(height: 2),
-                const Text(
-                  'اختبر نفسك',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF757575)),
+                const SizedBox(height: 4),
+                Text(
+                  '${_totalPercentage.toStringAsFixed(1)}%',
+                  style: const TextStyle(
+                    fontSize: 36,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
               ],
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              // Icon with blue background
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F6EB7),
-                  borderRadius: BorderRadius.circular(6),
+          SizedBox(
+            width: 70,
+            height: 70,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CircularProgressIndicator(
+                  value: _totalPercentage / 100,
+                  strokeWidth: 6,
+                  backgroundColor: Colors.white24,
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
-                child: const Icon(
-                  Icons.chevron_left,
-                  color: Colors.white,
-                  size: 20,
+                // ${_totalPercentage.toInt()}%
+                Text(
+                  '',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              // Score
-              Text(
-                'درجة الاختبار: ${assignment.scorePercentage.toInt()} %',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w400,
-                  color: Color(0xFF757575),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildCategorySection(Map<String, dynamic> category, int index) {
+    final isExpanded = _expandedCategories[index] ?? true;
+    final categoryName = category['categoryName'] as String? ?? '';
+    final weight = (category['weight'] as num?)?.toDouble() ?? 0.0;
+    final percentageScore =
+        (category['percentageScore'] as num?)?.toDouble() ?? 0.0;
+    final assignments = (category['assignments'] as List?) ?? [];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Category header
+          InkWell(
+            onTap: () {
+              setState(() {
+                _expandedCategories[index] = !isExpanded;
+              });
+            },
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F6EB7).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.category,
+                      color: Color(0xFF0F6EB7),
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          categoryName,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF333333),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Score badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _getScoreColor(
+                        percentageScore,
+                      ).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${percentageScore.toStringAsFixed(1)}%',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: _getScoreColor(percentageScore),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  AnimatedRotation(
+                    turns: isExpanded ? 0.25 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: const Icon(
+                      Icons.chevron_right,
+                      color: Color(0xFF0F6EB7),
+                      size: 24,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Assignments list
+          AnimatedCrossFade(
+            firstChild: Column(
+              children: [
+                const Divider(height: 1),
+                ...assignments.map(
+                  (a) => _buildAssignmentItem(
+                    a as Map<String, dynamic>,
+                    assignments.indexOf(a) == assignments.length - 1,
+                  ),
+                ),
+              ],
+            ),
+            secondChild: const SizedBox.shrink(),
+            crossFadeState: isExpanded
+                ? CrossFadeState.showFirst
+                : CrossFadeState.showSecond,
+            duration: const Duration(milliseconds: 200),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAssignmentItem(Map<String, dynamic> assignment, bool isLast) {
+    final name = assignment['assignmentName'] as String? ?? '';
+    final score = (assignment['scorePercentage'] as num?)?.toDouble() ?? 0.0;
+    final isSubmitted = assignment['isSubmitted'] as bool? ?? false;
+    final quizUrl = assignment['quizUrl'] as String?;
+
+    return Column(
+      children: [
+        InkWell(
+          onTap: quizUrl != null
+              ? () => launchUrl(
+                  Uri.parse(quizUrl),
+                  mode: LaunchMode.externalApplication,
+                )
+              : null,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                // Status icon
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: isSubmitted
+                        ? const Color(0xFF4CAF50).withValues(alpha: 0.1)
+                        : const Color(0xFFFF9800).withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isSubmitted ? Icons.check_circle : Icons.pending,
+                    color: isSubmitted
+                        ? const Color(0xFF4CAF50)
+                        : const Color(0xFFFF9800),
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Assignment name
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF333333),
+                        ),
+                      ),
+                      if (isSubmitted)
+                        const Text(
+                          'تم التسليم',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF4CAF50),
+                          ),
+                        )
+                      else
+                        const Text(
+                          'لم يتم التسليم',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFFFF9800),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                // Score
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${score.toStringAsFixed(1)}%',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: _getScoreColor(score),
+                      ),
+                    ),
+                    if (quizUrl != null)
+                      const Text(
+                        'عرض الاختبار',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF0F6EB7),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (!isLast) const Divider(height: 1, indent: 60),
+      ],
+    );
+  }
+
+  Color _getScoreColor(double score) {
+    if (score >= 80) return const Color(0xFF4CAF50);
+    if (score >= 50) return const Color(0xFFFF9800);
+    return const Color(0xFFE53935);
   }
 }

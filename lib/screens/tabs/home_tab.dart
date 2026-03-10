@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../models/course.dart';
 import '../../models/curriculum.dart';
+import '../../models/home_sections.dart';
 import '../../models/student_data.dart';
+import '../../models/task.dart';
 import '../../services/auth_service.dart';
 import '../../services/courses_service.dart';
 import '../../services/space_service.dart';
+import '../../widgets/home_sections.dart';
 import '../../widgets/posts_list_widget.dart';
 import '../../widgets/user_header.dart';
 
@@ -16,13 +20,9 @@ class HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<HomeTab> {
-  // Static course ID - will be dynamic in the future
   static const int _staticCourseId = 21273;
-
-  // TODO: Get actual userId from auth service - fallback for when studentData is not loaded
   static const String _fallbackUserId = 'c5061673-5b5f-4e5e-ab78-d9f51eef3dd2';
 
-  // Services
   final CoursesService _coursesService = CoursesService();
   final SpaceService _spaceService = SpaceService();
   final AuthService _authService = AuthService();
@@ -30,7 +30,7 @@ class _HomeTabState extends State<HomeTab> {
   // User data
   StudentData? _studentData;
 
-  // State for course and space
+  // Course & space state
   Course? _course;
   String? _spaceId;
   bool _isLoadingCourse = true;
@@ -38,19 +38,60 @@ class _HomeTabState extends State<HomeTab> {
   String? _courseError;
   String? _spaceError;
 
+  // Home sections data
+  List<LiveSession> _liveSessions = [];
+  List<RecommendedVideo> _recommendedVideos = [];
+  List<Task> _todayTasks = [];
+  int _incompleteTaskCount = 0;
+  List<int> _allCourseIds = [];
+
   @override
   void initState() {
     super.initState();
     _loadUserData();
     _loadCourseDetails();
+    _loadHomeSections();
   }
 
   Future<void> _loadUserData() async {
     final data = await _authService.getStudentData();
     if (mounted) {
+      setState(() => _studentData = data);
+    }
+  }
+
+  Future<void> _loadHomeSections() async {
+    final results = await Future.wait([
+      _coursesService.getLiveSessions(),
+      _coursesService.getRecommendedContent(),
+      _coursesService.getBundleCourses(),
+    ]);
+
+    final liveSessions = results[0] as List<LiveSession>;
+    final recommendedVideos = results[1] as List<RecommendedVideo>;
+    final courses = results[2] as List<Course>;
+
+    _allCourseIds = courses.map((c) => c.id).toList();
+
+    if (mounted) {
       setState(() {
-        _studentData = data;
+        _liveSessions = liveSessions;
+        _recommendedVideos = recommendedVideos;
       });
+    }
+
+    if (_allCourseIds.isNotEmpty) {
+      final userId = _studentData?.id ?? _fallbackUserId;
+      final tasksResponse = await _coursesService.getTasksByDayMultiCourse(
+        userId,
+        _allCourseIds,
+      );
+      if (mounted && tasksResponse != null && tasksResponse.success) {
+        setState(() {
+          _todayTasks = tasksResponse.allTasks;
+          _incompleteTaskCount = tasksResponse.incompleteCount;
+        });
+      }
     }
   }
 
@@ -62,23 +103,18 @@ class _HomeTabState extends State<HomeTab> {
     });
 
     try {
-      // Fetch course details from API
       final courseDetails = await _coursesService.getCourseById(
         _staticCourseId,
       );
 
       if (courseDetails != null) {
-        // Convert CourseDetails to Course for PostsListWidget
         _course = _convertToCourse(courseDetails);
-
         if (mounted) {
           setState(() {
             _isLoadingCourse = false;
             _isLoadingSpace = true;
           });
         }
-
-        // Now load the space for this course
         await _loadSpace();
       } else {
         if (mounted) {
@@ -124,7 +160,6 @@ class _HomeTabState extends State<HomeTab> {
     }
   }
 
-  /// Convert CourseDetails to Course model for PostsListWidget
   Course _convertToCourse(CourseDetails details) {
     return Course(
       id: details.id,
@@ -142,18 +177,19 @@ class _HomeTabState extends State<HomeTab> {
       isLifeTime: details.isLifeTime,
       isDeleted: details.isDeleted,
       courseSubscribed: details.courseSubscribed,
-      enrollmentType: 0, // Not available in CourseDetails
-      type: 0, // Not available in CourseDetails
+      enrollmentType: 0,
+      type: 0,
       isLive: details.isLive,
-      numOfTasks: 0, // Not available in CourseDetails
+      numOfTasks: 0,
       completedTasksPercentage: details.percentage.toDouble(),
       bundleOnly: details.bundleOnly,
     );
   }
 
-  Future<void> _retryLoad() async {
-    await _loadCourseDetails();
-  }
+  bool get _hasSections =>
+      _liveSessions.isNotEmpty ||
+      _todayTasks.isNotEmpty ||
+      _recommendedVideos.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -161,7 +197,12 @@ class _HomeTabState extends State<HomeTab> {
       backgroundColor: const Color(0xFFF5F5F5),
       body: Column(
         children: [
-          _buildHeader(context),
+          // Top user header with notifications
+          UserHeader(
+            userName: _studentData?.userBasicInfo.name ?? 'مستخدم',
+            userImage: _studentData?.userBasicInfo.profilePicture,
+          ),
+          // Main scrollable content
           Expanded(child: _buildContent()),
         ],
       ),
@@ -169,24 +210,12 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Widget _buildContent() {
-    // Show loading while course is being fetched
     if (_isLoadingCourse) {
       return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(color: Color(0xFF0F6EB7)),
-            SizedBox(height: 16),
-            Text(
-              'جاري تحميل بيانات المادة...',
-              style: TextStyle(fontSize: 14, color: Color(0xFF757575)),
-            ),
-          ],
-        ),
+        child: CircularProgressIndicator(color: Color(0xFF0F6EB7)),
       );
     }
 
-    // Show error if course failed to load
     if (_courseError != null) {
       return Center(
         child: Column(
@@ -200,7 +229,7 @@ class _HomeTabState extends State<HomeTab> {
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _retryLoad,
+              onPressed: _loadCourseDetails,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0F6EB7),
                 foregroundColor: Colors.white,
@@ -212,29 +241,75 @@ class _HomeTabState extends State<HomeTab> {
       );
     }
 
-    // Show PostsListWidget with course data
-    if (_course != null) {
-      return PostsListWidget(
-        course: _course!,
-        spaceId: _spaceId,
-        isLoadingSpace: _isLoadingSpace,
-        spaceError: _spaceError,
-        onRetryLoadSpace: _loadSpace,
-        showCourseHeader: true,
-        userName: _studentData?.userBasicInfo.name ?? 'مستخدم',
-        userImage: _studentData?.userBasicInfo.profilePicture,
-        currentUserId: _studentData?.id ?? _fallbackUserId,
-      );
+    if (_course == null) {
+      return const Center(child: Text('لا توجد بيانات'));
     }
 
-    // Fallback
-    return const Center(child: Text('لا توجد بيانات'));
-  }
-
-  Widget _buildHeader(BuildContext context) {
-    return UserHeader(
+    // Build the dashboard sections that go above the posts
+    return PostsListWidget(
+      course: _course!,
+      spaceId: _spaceId,
+      isLoadingSpace: _isLoadingSpace,
+      spaceError: _spaceError,
+      onRetryLoadSpace: _loadSpace,
+      showCourseHeader: true,
       userName: _studentData?.userBasicInfo.name ?? 'مستخدم',
       userImage: _studentData?.userBasicInfo.profilePicture,
+      currentUserId: _studentData?.id ?? _fallbackUserId,
+      headerWidgets: _buildDashboardSections(),
     );
+  }
+
+  /// Build the dashboard sections that appear ABOVE the course header.
+  /// These are cross-course (shared) sections: live sessions, tasks, videos.
+  List<Widget> _buildDashboardSections() {
+    if (!_hasSections) return [];
+
+    return [
+      // Live sessions
+      if (_liveSessions.isNotEmpty || true) // Always show — has empty state
+        LiveSessionsSection(sessions: _liveSessions),
+      // Today's tasks
+      if (_todayTasks.isNotEmpty)
+        TodayTasksSection(
+          tasks: _todayTasks,
+          incompleteCount: _incompleteTaskCount,
+          onTaskCompleted: _loadHomeSections,
+        ),
+      // Recommended videos
+      if (_recommendedVideos.isNotEmpty)
+        RecommendedVideosSection(videos: _recommendedVideos),
+      // Divider between dashboard and course feed
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            const Expanded(child: Divider(color: Color(0xFFE0E0E0))),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.forum_outlined,
+                    size: 18,
+                    color: Color(0xFF0F6EB7),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'آخر المنشورات',
+                    style: GoogleFonts.alexandria(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF757575),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Expanded(child: Divider(color: Color(0xFFE0E0E0))),
+          ],
+        ),
+      ),
+    ];
   }
 }

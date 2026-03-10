@@ -1,13 +1,77 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/post.dart';
 import '../services/space_service.dart';
 import '../services/post_service.dart';
+import '../screens/video_player_screen.dart';
 import '../services/comment_signalr_service.dart';
+
+final RegExp _urlRegex = RegExp(
+  r'https?://[^\s<>"\)]+',
+  caseSensitive: false,
+);
+
+Widget _buildLinkedText(String text) {
+  final matches = _urlRegex.allMatches(text).toList();
+  if (matches.isEmpty) {
+    return Text(
+      text,
+      textAlign: TextAlign.right,
+      textDirection: TextDirection.rtl,
+      style: const TextStyle(
+        fontSize: 14,
+        color: Color(0xFF333333),
+        height: 1.6,
+      ),
+    );
+  }
+
+  final spans = <TextSpan>[];
+  int lastEnd = 0;
+  for (final match in matches) {
+    if (match.start > lastEnd) {
+      spans.add(TextSpan(text: text.substring(lastEnd, match.start)));
+    }
+    final url = match.group(0)!;
+    spans.add(
+      TextSpan(
+        text: url,
+        style: const TextStyle(
+          color: Color(0xFF0F6EB7),
+          decoration: TextDecoration.underline,
+          decorationColor: Color(0xFF0F6EB7),
+        ),
+        recognizer: TapGestureRecognizer()
+          ..onTap = () => launchUrl(
+                Uri.parse(url),
+                mode: LaunchMode.externalApplication,
+              ),
+      ),
+    );
+    lastEnd = match.end;
+  }
+  if (lastEnd < text.length) {
+    spans.add(TextSpan(text: text.substring(lastEnd)));
+  }
+
+  return RichText(
+    textAlign: TextAlign.right,
+    textDirection: TextDirection.rtl,
+    text: TextSpan(
+      style: const TextStyle(
+        fontSize: 14,
+        color: Color(0xFF333333),
+        height: 1.6,
+      ),
+      children: spans,
+    ),
+  );
+}
 
 class PostCard extends StatefulWidget {
   final String? postId;
@@ -32,6 +96,9 @@ class PostCard extends StatefulWidget {
   final void Function(bool isLiked, int newCount)? onLikeChanged;
   final VoidCallback? onPostSheetClosed;
   final VoidCallback? onPostDeleted;
+  final int? postType;
+  final String? contentUrl;
+  final String? videoThumbnail;
 
   const PostCard({
     super.key,
@@ -57,6 +124,9 @@ class PostCard extends StatefulWidget {
     this.onLikeChanged,
     this.onPostSheetClosed,
     this.onPostDeleted,
+    this.postType,
+    this.contentUrl,
+    this.videoThumbnail,
   });
 
   @override
@@ -347,35 +417,95 @@ class _PostCardState extends State<PostCard> {
                 ],
               ),
             ),
-          // Post content (normal)
-          if (widget.content.isNotEmpty)
-            Padding(
-              padding: EdgeInsets.only(
-                left: 16,
-                right: 16,
-                top: (widget.title != null && widget.title!.isNotEmpty) ? 8 : 0,
+          // Video post (type == 2)
+          if (widget.postType == 2) ...[
+            if (widget.content.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: (widget.title != null && widget.title!.isNotEmpty) ? 8 : 0,
+                ),
+                child: _buildLinkedText(widget.content),
               ),
-              child: Text(
-                widget.content,
-                textAlign: TextAlign.right,
-                textDirection: TextDirection.rtl,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF333333),
-                  height: 1.6,
+            if (widget.videoThumbnail != null && widget.videoThumbnail!.isNotEmpty)
+              GestureDetector(
+                onTap: () {
+                  if (widget.contentUrl != null && widget.contentUrl!.isNotEmpty) {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => VideoPlayerScreen(
+                          videoUrl: widget.contentUrl!,
+                          title: widget.title ?? '',
+                        ),
+                      ),
+                    );
+                  }
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Image.network(
+                          widget.videoThumbnail!,
+                          width: double.infinity,
+                          height: 200,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                            width: double.infinity,
+                            height: 200,
+                            color: Colors.grey.shade200,
+                            child: const Icon(
+                              Icons.videocam,
+                              size: 48,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.6),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.play_arrow,
+                            color: Colors.white,
+                            size: 36,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
-          // Post images grid
-          if (widget.images != null && widget.images!.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: _PostImagesGrid(
-                images: widget.images!,
-                onImageTap: (index) =>
-                    _showImageGallery(context, widget.images!, index),
+          ] else ...[
+            // Post content (normal)
+            if (widget.content.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: (widget.title != null && widget.title!.isNotEmpty) ? 8 : 0,
+                ),
+                child: _buildLinkedText(widget.content),
               ),
-            ),
+            // Post images grid
+            if (widget.images != null && widget.images!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: _PostImagesGrid(
+                  images: widget.images!,
+                  onImageTap: (index) =>
+                      _showImageGallery(context, widget.images!, index),
+                ),
+              ),
+          ],
           // Document files
           if (widget.files != null && widget.files!.isNotEmpty)
             Padding(
@@ -1702,31 +1832,91 @@ class _SinglePostSheetState extends State<SinglePostSheet> {
               ],
             ),
           ),
-        // Post content (normal)
-        if (content.isNotEmpty)
-          Padding(
-            padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: (title != null && title.isNotEmpty) ? 8 : 0,
+        // Video post (type == 2)
+        if (post.isVideo) ...[
+          if (content.isNotEmpty)
+            Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: (title != null && title.isNotEmpty) ? 8 : 0,
+              ),
+              child: _buildLinkedText(content),
             ),
-            child: Text(
-              content,
-              textAlign: TextAlign.right,
-              textDirection: TextDirection.rtl,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF333333),
-                height: 1.6,
+          if (post.videoThumbnail != null && post.videoThumbnail!.isNotEmpty)
+            GestureDetector(
+              onTap: () {
+                if (post.contentUrl != null && post.contentUrl!.isNotEmpty) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => VideoPlayerScreen(
+                        videoUrl: post.contentUrl!,
+                        title: post.title ?? '',
+                      ),
+                    ),
+                  );
+                }
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Image.network(
+                        post.videoThumbnail!,
+                        width: double.infinity,
+                        height: 200,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            Container(
+                          width: double.infinity,
+                          height: 200,
+                          color: Colors.grey.shade200,
+                          child: const Icon(
+                            Icons.videocam,
+                            size: 48,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.6),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.play_arrow,
+                          color: Colors.white,
+                          size: 36,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
-          ),
-        // Post images grid
-        if (images.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: _buildPostImagesGrid(images),
-          ),
+        ] else ...[
+          // Post content (normal)
+          if (content.isNotEmpty)
+            Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: (title != null && title.isNotEmpty) ? 8 : 0,
+              ),
+              child: _buildLinkedText(content),
+            ),
+          // Post images grid
+          if (images.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: _buildPostImagesGrid(images),
+            ),
+        ],
         // Document files
         if (post.documentFiles.isNotEmpty)
           Padding(

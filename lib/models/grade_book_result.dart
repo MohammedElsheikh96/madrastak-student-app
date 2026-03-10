@@ -20,20 +20,26 @@ class GradeBookResult {
 
 class CategoryResult {
   final String categoryName;
+  final double weight;
   final List<Assignment> assignments;
+  final double percentageScore;
 
   CategoryResult({
     required this.categoryName,
+    required this.weight,
     required this.assignments,
+    required this.percentageScore,
   });
 
   factory CategoryResult.fromJson(Map<String, dynamic> json) {
     return CategoryResult(
       categoryName: json['categoryName'] as String? ?? '',
+      weight: (json['weight'] as num?)?.toDouble() ?? 0.0,
       assignments: (json['assignments'] as List<dynamic>?)
               ?.map((e) => Assignment.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
+      percentageScore: (json['percentageScore'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }
@@ -41,19 +47,28 @@ class CategoryResult {
 class Assignment {
   final String assignmentName;
   final double scorePercentage;
-  final String? assignmentId;
+  final bool isSubmitted;
+  final int? courseId;
+  final String? externalQuizId;
+  final String? quizUrl;
 
   Assignment({
     required this.assignmentName,
     required this.scorePercentage,
-    this.assignmentId,
+    this.isSubmitted = false,
+    this.courseId,
+    this.externalQuizId,
+    this.quizUrl,
   });
 
   factory Assignment.fromJson(Map<String, dynamic> json) {
     return Assignment(
       assignmentName: json['assignmentName'] as String? ?? '',
       scorePercentage: (json['scorePercentage'] as num?)?.toDouble() ?? 0.0,
-      assignmentId: json['assignmentId'] as String?,
+      isSubmitted: json['isSubmitted'] as bool? ?? false,
+      courseId: json['courseId'] as int?,
+      externalQuizId: json['externalQuizId'] as String?,
+      quizUrl: json['quizUrl'] as String?,
     );
   }
 }

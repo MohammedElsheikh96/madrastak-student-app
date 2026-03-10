@@ -3,6 +3,8 @@ class Post {
   final String? spaceId;
   final String? title;
   final String? content;
+  final int? type;
+  final String? contentUrl;
   final int viewCount;
   final int commentsCount;
   final int likesCount;
@@ -22,6 +24,8 @@ class Post {
     this.spaceId,
     this.title,
     this.content,
+    this.type,
+    this.contentUrl,
     this.viewCount = 0,
     this.commentsCount = 0,
     this.likesCount = 0,
@@ -36,6 +40,15 @@ class Post {
     this.lastModified,
     this.lastModifiedBy,
   });
+
+  bool get isVideo => type == 2;
+
+  /// Extract image URL from HTML content (for video posts)
+  String? get videoThumbnail {
+    if (content == null) return null;
+    final imgMatch = RegExp(r'src="([^"]+)"').firstMatch(content!);
+    return imgMatch?.group(1);
+  }
 
   factory Post.fromJson(Map<String, dynamic> json) {
     // Parse files
@@ -63,6 +76,8 @@ class Post {
       spaceId: json['spaceId']?.toString(),
       title: json['title'],
       content: json['content'],
+      type: json['type'],
+      contentUrl: json['contentUrl'],
       viewCount: json['viewCount'] ?? 0,
       commentsCount: json['commentsCount'] ?? 0,
       likesCount: json['likesCount'] ?? 0,
@@ -154,6 +169,8 @@ class Post {
       'spaceId': spaceId,
       'title': title,
       'content': content,
+      'type': type,
+      'contentUrl': contentUrl,
       'viewCount': viewCount,
       'commentsCount': commentsCount,
       'likesCount': likesCount,

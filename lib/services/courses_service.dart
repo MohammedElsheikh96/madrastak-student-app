@@ -7,6 +7,7 @@ import 'package:http/io_client.dart';
 import '../models/course.dart';
 import '../models/curriculum.dart';
 import '../models/task.dart';
+import '../models/home_sections.dart';
 import 'api_client.dart';
 
 class CoursesService {
@@ -421,5 +422,100 @@ class CoursesService {
 
     debugPrint('CoursesService: Generated signed PDF URL: $signedUrl');
     return signedUrl;
+  }
+
+  /// Get live sessions for today
+  Future<List<LiveSession>> getLiveSessions() async {
+    final client = _createHttpClient();
+    try {
+      final uri = Uri.parse('$_coursesBaseUrl/LearningObject/GetLiveSessions');
+      final response = await client.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $staticToken',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final jsonData = jsonDecode(response.body);
+        if (jsonData['success'] == true && jsonData['returnObject'] != null) {
+          final data = jsonData['returnObject']['data'] as List<dynamic>?;
+          return data?.map((item) => LiveSession.fromJson(item)).toList() ?? [];
+        }
+      }
+      return [];
+    } catch (e) {
+      debugPrint('CoursesService: getLiveSessions error: $e');
+      return [];
+    } finally {
+      client.close();
+    }
+  }
+
+  /// Get recommended video content
+  Future<List<RecommendedVideo>> getRecommendedContent() async {
+    final client = _createHttpClient();
+    try {
+      final uri = Uri.parse(
+        '$_coursesBaseUrl/LearningObject/GetRecommendedContent',
+      );
+      final response = await client.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $staticToken',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final jsonData = jsonDecode(response.body);
+        if (jsonData['success'] == true && jsonData['returnObject'] != null) {
+          final data = jsonData['returnObject'] as List<dynamic>;
+          return data.map((item) => RecommendedVideo.fromJson(item)).toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      debugPrint('CoursesService: getRecommendedContent error: $e');
+      return [];
+    } finally {
+      client.close();
+    }
+  }
+
+  /// Get tasks by day for multiple courses
+  Future<TasksByDayResponse?> getTasksByDayMultiCourse(
+    String userId,
+    List<int> courseIds, {
+    int pageNumber = 1,
+    int pageSize = 50,
+  }) async {
+    final client = _createHttpClient();
+    try {
+      final courseParams = courseIds.map((id) => 'courseId=$id').join('&');
+      final uri = Uri.parse(
+        '$_tasksBaseUrl/Tasks/GetNewTasksByDay?UserId=$userId&$courseParams&PageNumber=$pageNumber&PageSize=$pageSize',
+      );
+
+      final response = await client.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $staticToken',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final jsonData = jsonDecode(response.body);
+        return TasksByDayResponse.fromJson(jsonData);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('CoursesService: getTasksByDayMultiCourse error: $e');
+      return null;
+    } finally {
+      client.close();
+    }
   }
 }

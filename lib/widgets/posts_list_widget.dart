@@ -38,6 +38,9 @@ class PostsListWidget extends StatefulWidget {
   /// Current user ID for checking post ownership
   final String? currentUserId;
 
+  /// Optional widgets to display before the posts list
+  final List<Widget>? headerWidgets;
+
   const PostsListWidget({
     super.key,
     this.course,
@@ -50,6 +53,7 @@ class PostsListWidget extends StatefulWidget {
     required this.userName,
     this.userImage,
     this.currentUserId,
+    this.headerWidgets,
   });
 
   @override
@@ -257,8 +261,15 @@ class _PostsListWidgetState extends State<PostsListWidget> {
           padding: const EdgeInsets.only(bottom: 120),
           itemCount: _getItemCount(),
           itemBuilder: (context, index) {
-            // Course header or create post area
-            if (_hasHeader && index == 0) {
+            // Header widgets FIRST (dashboard sections above the course header)
+            final headerWidgetCount = widget.headerWidgets?.length ?? 0;
+            if (headerWidgetCount > 0 && index < headerWidgetCount) {
+              return widget.headerWidgets![index];
+            }
+
+            // Course header or create post area (after header widgets)
+            final afterHeaderIndex = index - headerWidgetCount;
+            if (_hasHeader && afterHeaderIndex == 0) {
               if (widget.showCourseHeader) {
                 return _buildCourseHeader();
               } else {
@@ -266,8 +277,9 @@ class _PostsListWidgetState extends State<PostsListWidget> {
               }
             }
 
-            // Adjust index if header is shown
-            final adjustedIndex = _hasHeader ? index - 1 : index;
+            // Adjust index for posts
+            final headerOffset = _hasHeader ? 1 : 0;
+            final adjustedIndex = afterHeaderIndex - headerOffset;
 
             // Loading posts indicator (initial load)
             if (_isLoadingPosts && _posts.isEmpty) {
@@ -371,7 +383,10 @@ class _PostsListWidgetState extends State<PostsListWidget> {
                   currentUserId: widget.currentUserId,
                   date: post.formattedDate,
                   title: post.title,
-                  content: post.plainContent,
+                  content: post.isVideo ? '' : post.plainContent,
+                  postType: post.type,
+                  contentUrl: post.contentUrl,
+                  videoThumbnail: post.videoThumbnail,
                   images: post.images.isNotEmpty ? post.images : null,
                   files: post.files.isNotEmpty ? post.files : null,
                   isCoursPost: false,
@@ -433,6 +448,7 @@ class _PostsListWidgetState extends State<PostsListWidget> {
 
   int _getItemCount() {
     int count = _hasHeader ? 1 : 0; // Header or create post
+    count += widget.headerWidgets?.length ?? 0; // Extra header widgets
     if (_isLoadingPosts && _posts.isEmpty) {
       count++; // Loading indicator
     } else if (_postsError != null && _posts.isEmpty) {
