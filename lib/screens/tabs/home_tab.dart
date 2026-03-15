@@ -43,7 +43,7 @@ class _HomeTabState extends State<HomeTab> {
   List<RecommendedVideo> _recommendedVideos = [];
   List<Task> _todayTasks = [];
   int _incompleteTaskCount = 0;
-  List<int> _allCourseIds = [];
+  List<Course> _bundleCourses = [];
 
   @override
   void initState() {
@@ -71,20 +71,21 @@ class _HomeTabState extends State<HomeTab> {
     final recommendedVideos = results[1] as List<RecommendedVideo>;
     final courses = results[2] as List<Course>;
 
-    _allCourseIds = courses.map((c) => c.id).toList();
+    final allCourseIds = courses.map((c) => c.id).toList();
 
     if (mounted) {
       setState(() {
         _liveSessions = liveSessions;
         _recommendedVideos = recommendedVideos;
+        _bundleCourses = courses;
       });
     }
 
-    if (_allCourseIds.isNotEmpty) {
+    if (allCourseIds.isNotEmpty) {
       final userId = _studentData?.id ?? _fallbackUserId;
       final tasksResponse = await _coursesService.getTasksByDayMultiCourse(
         userId,
-        _allCourseIds,
+        allCourseIds,
       );
       if (mounted && tasksResponse != null && tasksResponse.success) {
         setState(() {
@@ -186,11 +187,6 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  bool get _hasSections =>
-      _liveSessions.isNotEmpty ||
-      _todayTasks.isNotEmpty ||
-      _recommendedVideos.isNotEmpty;
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -245,14 +241,15 @@ class _HomeTabState extends State<HomeTab> {
       return const Center(child: Text('لا توجد بيانات'));
     }
 
-    // Build the dashboard sections that go above the posts
+    // Build the posts list with dashboard sections above
     return PostsListWidget(
       course: _course!,
       spaceId: _spaceId,
       isLoadingSpace: _isLoadingSpace,
       spaceError: _spaceError,
       onRetryLoadSpace: _loadSpace,
-      showCourseHeader: true,
+      showCourseHeader: false,
+      showCreatePost: true,
       userName: _studentData?.userBasicInfo.name ?? 'مستخدم',
       userImage: _studentData?.userBasicInfo.profilePicture,
       currentUserId: _studentData?.id ?? _fallbackUserId,
@@ -260,26 +257,34 @@ class _HomeTabState extends State<HomeTab> {
     );
   }
 
-  /// Build the dashboard sections that appear ABOVE the course header.
-  /// These are cross-course (shared) sections: live sessions, tasks, videos.
+  /// Build the dashboard sections matching the target design order:
+  /// 1. Study Materials (horizontal course cards)
+  /// 2. Live Sessions
+  /// 3. Today's Tasks
+  /// 4. Recommended Videos
+  /// 5. Divider with "Latest Posts" label
   List<Widget> _buildDashboardSections() {
-    if (!_hasSections) return [];
-
     return [
-      // Live sessions
-      if (_liveSessions.isNotEmpty || true) // Always show — has empty state
-        LiveSessionsSection(sessions: _liveSessions),
-      // Today's tasks
+      // 1. Study Materials — horizontal course cards
+      if (_bundleCourses.isNotEmpty)
+        StudyMaterialsSection(courses: _bundleCourses),
+
+      // 2. Live sessions
+      LiveSessionsSection(sessions: _liveSessions),
+
+      // 3. Today's tasks
       if (_todayTasks.isNotEmpty)
         TodayTasksSection(
           tasks: _todayTasks,
           incompleteCount: _incompleteTaskCount,
           onTaskCompleted: _loadHomeSections,
         ),
-      // Recommended videos
+
+      // 4. Recommended videos
       if (_recommendedVideos.isNotEmpty)
         RecommendedVideosSection(videos: _recommendedVideos),
-      // Divider between dashboard and course feed
+
+      // 5. Divider between dashboard and course feed
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(

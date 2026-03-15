@@ -25,7 +25,9 @@
       "Bash(flutter.bat analyze lib/screens/course_tabs/assessments_tab.dart)",
       "Bash(flutter.bat analyze lib/widgets/home_sections.dart)",
       "Bash(flutter.bat analyze lib/screens/tabs/home_tab.dart)",
-      "Bash(flutter.bat analyze lib/screens/tabs/home_tab.dart lib/widgets/posts_list_widget.dart)"
+      "Bash(flutter.bat analyze lib/screens/tabs/home_tab.dart lib/widgets/posts_list_widget.dart)",
+      "WebFetch(domain:mfm-web.madrasetna.net)",
+      "Bash(flutter.bat analyze:*)"
     ]
   }
 }

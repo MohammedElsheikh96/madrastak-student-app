@@ -1,12 +1,153 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../models/course.dart';
 import '../models/home_sections.dart';
 import '../models/task.dart';
+import '../screens/course_details_page.dart';
 import '../screens/external_quiz_screen.dart';
 import '../screens/video_player_screen.dart';
 import '../services/courses_service.dart';
 import '../widgets/post_card.dart';
+
+// ─── Study Materials Section (Horizontal Course Cards) ──────
+
+class StudyMaterialsSection extends StatelessWidget {
+  final List<Course> courses;
+
+  const StudyMaterialsSection({super.key, required this.courses});
+
+  static const List<Color> _cardBorderColors = [
+    Color(0xFF2EC4B6), // teal/cyan
+    Color(0xFFE91E63), // pink
+    Color(0xFF7C4DFF), // purple
+    Color(0xFFFFB300), // amber/gold
+    Color(0xFFFF7043), // orange
+    Color(0xFF66BB6A), // green
+    Color(0xFF42A5F5), // blue
+    Color(0xFFEF5350), // red
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox.shrink();
+    // if (courses.isEmpty) return const SizedBox.shrink();
+
+    // return Container(
+    //   margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    //   padding: const EdgeInsets.all(16),
+    //   decoration: BoxDecoration(
+    //     color: Colors.white,
+    //     borderRadius: BorderRadius.circular(16),
+    //     boxShadow: [
+    //       BoxShadow(
+    //         color: Colors.black.withValues(alpha: 0.05),
+    //         blurRadius: 8,
+    //         offset: const Offset(0, 2),
+    //       ),
+    //     ],
+    //   ),
+    //   child: Column(
+    //     crossAxisAlignment: CrossAxisAlignment.start,
+    //     children: [
+    //       Text(
+    //         'المواد الدراسية',
+    //         style: GoogleFonts.alexandria(
+    //           fontSize: 16,
+    //           fontWeight: FontWeight.bold,
+    //           color: const Color(0xFF333333),
+    //         ),
+    //       ),
+    //       const SizedBox(height: 14),
+    //       SizedBox(
+    //         height: 155,
+    //         child: ListView.separated(
+    //           scrollDirection: Axis.horizontal,
+    //           itemCount: courses.length,
+    //           separatorBuilder: (_, _) => const SizedBox(width: 12),
+    //           itemBuilder: (context, index) {
+    //             return _buildCourseCard(context, courses[index], index);
+    //           },
+    //         ),
+    //       ),
+    //     ],
+    //   ),
+    // );
+  }
+
+  Widget _buildCourseCard(BuildContext context, Course course, int index) {
+    final borderColor = _getCardColor(course, index);
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => CourseDetailsPage(course: course),
+          ),
+        );
+      },
+      child: SizedBox(
+        width: 110,
+        child: Column(
+          children: [
+            // Image card with colored border
+            Container(
+              width: 110,
+              height: 120,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: borderColor, width: 3),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(11),
+                child: course.image != null && course.image!.isNotEmpty
+                    ? Image.network(
+                        course.image!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) =>
+                            _buildPlaceholder(borderColor),
+                      )
+                    : _buildPlaceholder(borderColor),
+              ),
+            ),
+            const SizedBox(height: 6),
+            // Course name
+            Text(
+              course.displayName,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.alexandria(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF333333),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _getCardColor(Course course, int index) {
+    // Use course color from API if available
+    if (course.color != null) {
+      try {
+        final hex = course.color!.code.replaceFirst('#', '');
+        return Color(int.parse('FF$hex', radix: 16));
+      } catch (_) {}
+    }
+    // Fallback to predefined colors cycling
+    return _cardBorderColors[index % _cardBorderColors.length];
+  }
+
+  Widget _buildPlaceholder(Color color) {
+    return Container(
+      color: color.withValues(alpha: 0.1),
+      child: Center(child: Icon(Icons.menu_book, size: 36, color: color)),
+    );
+  }
+}
 
 // ─── Live Sessions Section ───────────────────────────────────
 
@@ -65,11 +206,7 @@ class LiveSessionsSection extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 20),
         child: Column(
           children: [
-            Icon(
-              Icons.event_busy,
-              size: 40,
-              color: Colors.grey.shade300,
-            ),
+            Icon(Icons.event_busy, size: 40, color: Colors.grey.shade300),
             const SizedBox(height: 8),
             Text(
               'لا توجد حصص مباشرة اليوم',
@@ -113,8 +250,10 @@ class LiveSessionsSection extends StatelessWidget {
               ),
               if (isLive)
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFE91E63),
                     borderRadius: BorderRadius.circular(12),
@@ -249,14 +388,20 @@ class RecommendedVideosSection extends StatelessWidget {
                         fit: BoxFit.cover,
                         errorBuilder: (_, _, _) => Container(
                           color: Colors.grey.shade200,
-                          child: const Icon(Icons.play_circle_fill,
-                              color: Colors.grey, size: 32),
+                          child: const Icon(
+                            Icons.play_circle_fill,
+                            color: Colors.grey,
+                            size: 32,
+                          ),
                         ),
                       )
                     : Container(
                         color: Colors.grey.shade200,
-                        child: const Icon(Icons.play_circle_fill,
-                            color: Colors.grey, size: 32),
+                        child: const Icon(
+                          Icons.play_circle_fill,
+                          color: Colors.grey,
+                          size: 32,
+                        ),
                       ),
               ),
             ),
@@ -350,8 +495,10 @@ class _TodayTasksSectionState extends State<TodayTasksSection> {
               ),
               if (widget.incompleteCount > 0)
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF4CAF50).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
@@ -405,7 +552,8 @@ class _TodayTasksSectionState extends State<TodayTasksSection> {
           borderRadius: BorderRadius.circular(12),
           border: !isCompleted
               ? Border.all(
-                  color: const Color(0xFFFF9800).withValues(alpha: 0.3))
+                  color: const Color(0xFFFF9800).withValues(alpha: 0.3),
+                )
               : null,
         ),
         child: Row(
@@ -416,9 +564,7 @@ class _TodayTasksSectionState extends State<TodayTasksSection> {
               height: 28,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isCompleted
-                    ? const Color(0xFF4CAF50)
-                    : Colors.white,
+                color: isCompleted ? const Color(0xFF4CAF50) : Colors.white,
                 border: !isCompleted
                     ? Border.all(color: const Color(0xFFBDBDBD), width: 2)
                     : null,
@@ -438,7 +584,9 @@ class _TodayTasksSectionState extends State<TodayTasksSection> {
                       // Type badge
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: task.typeColor.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
@@ -466,15 +614,18 @@ class _TodayTasksSectionState extends State<TodayTasksSection> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    task.displayName.isNotEmpty ? task.displayName : task.taskName,
+                    task.displayName.isNotEmpty
+                        ? task.displayName
+                        : task.taskName,
                     style: GoogleFonts.alexandria(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                       color: isCompleted
                           ? const Color(0xFF9E9E9E)
                           : const Color(0xFF333333),
-                      decoration:
-                          isCompleted ? TextDecoration.lineThrough : null,
+                      decoration: isCompleted
+                          ? TextDecoration.lineThrough
+                          : null,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -514,7 +665,10 @@ class _TodayTasksSectionState extends State<TodayTasksSection> {
     if (videoUrl == null || videoUrl.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('لا يوجد رابط للفيديو', style: GoogleFonts.alexandria()),
+          content: Text(
+            'لا يوجد رابط للفيديو',
+            style: GoogleFonts.alexandria(),
+          ),
           backgroundColor: Colors.red,
         ),
       );
@@ -546,7 +700,10 @@ class _TodayTasksSectionState extends State<TodayTasksSection> {
     if (quizUrl == null || quizUrl.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('لا يوجد رابط للاختبار', style: GoogleFonts.alexandria()),
+          content: Text(
+            'لا يوجد رابط للاختبار',
+            style: GoogleFonts.alexandria(),
+          ),
           backgroundColor: Colors.red,
         ),
       );
@@ -611,7 +768,15 @@ class _TodayTasksSectionState extends State<TodayTasksSection> {
     if (dateStr == null) return '';
     final date = DateTime.tryParse(dateStr);
     if (date == null) return '';
-    final days = ['الاحد', 'الاثنين', 'الثلاثاء', 'الاربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    final days = [
+      'الاحد',
+      'الاثنين',
+      'الثلاثاء',
+      'الاربعاء',
+      'الخميس',
+      'الجمعة',
+      'السبت',
+    ];
     final dayName = days[date.weekday % 7];
     final hour = date.hour > 12 ? date.hour - 12 : date.hour;
     final period = date.hour >= 12 ? 'م' : 'ص';

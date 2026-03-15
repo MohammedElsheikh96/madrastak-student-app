@@ -600,22 +600,25 @@ class _PostsListWidgetState extends State<PostsListWidget> {
   }
 
   Widget _buildCreatePostArea() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.all(16),
-      child: GestureDetector(
-        onTap: () => _showCreatePostPopup(),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF5F5F5),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Text(
-            'شارك افكارك هنا؟',
-            textAlign: TextAlign.right,
-            style: TextStyle(fontSize: 14, color: Color(0xFF9E9E9E)),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        color: Colors.white,
+        padding: const EdgeInsets.all(16),
+        child: GestureDetector(
+          onTap: () => _showCreatePostPopup(),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F5F5),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text(
+              'شارك افكارك هنا؟',
+              textAlign: TextAlign.right,
+              style: TextStyle(fontSize: 14, color: Color(0xFF9E9E9E)),
+            ),
           ),
         ),
       ),
